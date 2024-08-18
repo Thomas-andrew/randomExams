@@ -1,65 +1,39 @@
 package main
 
-import (
-	"fmt"
-	"strconv"
+import "fyne.io/fyne/v2"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/widget"
-)
+type ingestRowLayout struct{}
 
-type IngestRow struct {
-	buttons []fyne.CanvasObject
-	images  []fyne.CanvasObject
-
-	buttonsCont *fyne.Container
-	imagesCont  *fyne.Container
-
-	basePath string
-	numList  int
+func NewIngestRowLayout() *ingestRowLayout {
+	return &ingestRowLayout{}
 }
 
-func NewIngestRow(pg string, w fyne.Window) *IngestRow {
-	btnCont := container.New(layout.NewVBoxLayout())
-	imgCont := container.New(layout.NewVBoxLayout())
+const padding float32 = 20
 
-	ingest := &IngestRow{
-		basePath:    "./imgs/img_test-" + pg,
-		buttonsCont: btnCont,
-		imagesCont:  imgCont,
+func (l *ingestRowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	if len(objs) != 2 {
+		return
 	}
-	button := widget.NewButton("add image", func() {
-		ingest.AddImage(w)
-	})
 
-	ingest.buttons = append(ingest.buttons, button)
-	btnCont.Add(button)
+	leftWidth := size.Width * 0.1
+	rightWidth := size.Width * 0.9
 
-	return ingest
+	// buttons
+	objs[0].Resize(fyne.NewSize(leftWidth, size.Height))
+	objs[0].Move(fyne.NewPos(0, size.Height/2))
+
+	// imgs
+	objs[1].Resize(fyne.NewSize(rightWidth-padding, size.Height-padding))
+	objs[1].Move(fyne.NewPos(leftWidth+padding, padding))
 }
 
-func (i *IngestRow) AddImage(w fyne.Window) {
-	num := len(i.buttons)
-	path := i.basePath + strconv.Itoa(num) + ".png"
-	screenshoot(path)
-	img := canvas.NewImageFromFile(path)
-	img.SetMinSize(fyne.NewSize(200, 100))
-	img.FillMode = canvas.ImageFillContain
-	i.images = append(i.images, img)
-	i.imagesCont.Add(img)
+func (l *ingestRowLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	if len(objs) != 2 {
+		return fyne.NewSize(0, 0)
+	}
 
-	button := widget.NewButton(fmt.Sprintf("retake %v-%v", i.numList, num), func() {
-		err := screenshoot(path)
-		if err != nil {
-			dialog.ShowError(err, w)
-		}
-		img.Refresh()
-	})
+	leftMin := objs[0].MinSize()
+	rightMin := objs[1].MinSize()
 
-	i.buttons = append(i.buttons, button)
-	i.buttonsCont.Add(button)
+	return fyne.NewSize(leftMin.Width+rightMin.Width, fyne.Max(leftMin.Height, rightMin.Height))
 }
