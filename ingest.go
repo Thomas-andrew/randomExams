@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"sort"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -12,13 +14,58 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+type ingestData struct {
+	rows  []*ingestDataRow
+	mapEx map[int][]string
+
+	num int
+}
+
 func makeExIngest(w fyne.Window) fyne.CanvasObject {
 	entry := widget.NewEntry()
-	entry.SetPlaceHolder("Enter number of screenshoots")
+	entry.SetPlaceHolder("Diga quantos exercicios:")
+
+	book := widget.NewEntry()
+	bookLabel := widget.NewLabel("0")
+
+	bookList := []string{
+		"elon lages, Curso de analise 1",
+		"elon lages, Curso de analise 2",
+		"Tu, analise em variedades",
+		"manfredo do carmo, geometria diferencial",
+	}
+
+	// var completion string
+
+	book.OnChanged = func(text string) {
+		subs := powerSet(text)
+
+		sort.Slice(bookList, func(i, j int) bool {
+			return bookScore(subs, bookList[i]) > bookScore(subs, bookList[j])
+		})
+
+		var str string = ""
+
+		for _, book := range bookList {
+			str += fmt.Sprintf(
+				"score: %v,\t %v\n",
+				bookScore(subs, book),
+				book,
+			)
+		}
+
+		bookLabel.SetText(str)
+	}
+
+	bookSearch := container.NewVBox(
+		book,
+		bookLabel,
+	)
 
 	form := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: "number", Widget: entry},
+			{Text: "exercicios", Widget: entry},
+			{Text: "Livro", Widget: bookSearch},
 		},
 		OnSubmit: func() {
 			numEntries, err := strconv.Atoi(entry.Text)
@@ -26,21 +73,55 @@ func makeExIngest(w fyne.Window) fyne.CanvasObject {
 				dialog.ShowError(err, w)
 			}
 
+			if numEntries <= 0 {
+				return
+			}
+
+			ingestData := &ingestData{
+				num:   numEntries,
+				mapEx: make(map[int][]string),
+			}
+
+			buttonTop := widget.NewButton(
+				"Save",
+				func() {
+					confirmDialog := dialog.NewConfirm(
+						"Confirmação para salvar",
+						"Você quer salvar esses exercicios?",
+						func(response bool) {
+							if response {
+								for i, row := range ingestData.rows {
+									log.Printf("{ex: %v, path: %v}\n", i+1, row.CurrentImages())
+								}
+							} else {
+								log.Println("noppers...")
+							}
+						},
+						w,
+					)
+					confirmDialog.Show()
+				},
+			)
+
 			vertList := container.New(layout.NewVBoxLayout())
 
 			scrollVertList := container.NewScroll(vertList)
+			border := container.NewBorder(buttonTop, nil, nil, nil, scrollVertList)
+			w.SetContent(border)
 
 			for i := 1; i <= numEntries; i++ {
-				ingestRowData := NewIngestRow(i, w)
-				ingestRowData.AddImage(w)
+				ingestDataRow := NewIngestData(i, w)
+				ingestDataRow.AddImage(w)
+
+				ingestData.rows = append(ingestData.rows, ingestDataRow)
 
 				ingestRow := container.New(
 					NewIngestRowLayout(),
-					ingestRowData.buttons,
-					ingestRowData.images,
+					ingestDataRow.buttons,
+					ingestDataRow.images,
 				)
 				vertList.Add(ingestRow)
-				w.SetContent(scrollVertList)
+				w.SetContent(border)
 			}
 		},
 	}
@@ -48,20 +129,21 @@ func makeExIngest(w fyne.Window) fyne.CanvasObject {
 	// fyne.Layout
 }
 
-type ingestData struct {
+type ingestDataRow struct {
 	images  *fyne.Container
 	buttons *fyne.Container
 
-	path string
-	num  int
-	id   int
+	path     string
+	imgPaths []string
+	num      int
+	id       int
 }
 
-func NewIngestRow(id int, w fyne.Window) *ingestData {
+func NewIngestData(id int, w fyne.Window) *ingestDataRow {
 	images := container.NewVBox()
 	buttons := container.NewVBox()
 
-	ingest := &ingestData{
+	ingest := &ingestDataRow{
 		images:  images,
 		buttons: buttons,
 
@@ -82,7 +164,11 @@ func NewIngestRow(id int, w fyne.Window) *ingestData {
 	return ingest
 }
 
-func (g *ingestData) AddImage(w fyne.Window) {
+func (g *ingestDataRow) CurrentImages() []string {
+	return g.imgPaths
+}
+
+func (g *ingestDataRow) AddImage(w fyne.Window) {
 	g.num += 1
 	path := g.path + "-" + strconv.Itoa(g.id) + strconv.Itoa(g.num) + ".png"
 	err := screenshoot(path)
@@ -94,6 +180,7 @@ func (g *ingestData) AddImage(w fyne.Window) {
 	img.SetMinSize(fyne.NewSize(700, 500))
 	img.FillMode = canvas.ImageFillContain
 	g.images.Add(img)
+	g.imgPaths = append(g.imgPaths, img.File)
 
 	retakeButton := widget.NewButton(
 		fmt.Sprintf("retake %v", g.num),
