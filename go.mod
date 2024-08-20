@@ -2,7 +2,10 @@ module randomEx
 
 go 1.22.4
 
-require fyne.io/fyne/v2 v2.5.0
+require (
+	fyne.io/fyne/v2 v2.5.0
+	github.com/mattn/go-sqlite3 v1.14.22
+)
 
 require (
 	fyne.io/systray v1.11.0 // indirect

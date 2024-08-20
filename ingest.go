@@ -21,7 +21,7 @@ type ingestData struct {
 	num int
 }
 
-func makeExIngest(w fyne.Window) fyne.CanvasObject {
+func makeExIngest(g *GUI) fyne.CanvasObject {
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder("Diga quantos exercicios:")
 
@@ -70,7 +70,7 @@ func makeExIngest(w fyne.Window) fyne.CanvasObject {
 		OnSubmit: func() {
 			numEntries, err := strconv.Atoi(entry.Text)
 			if err != nil {
-				dialog.ShowError(err, w)
+				dialog.ShowError(err, g.window)
 			}
 
 			if numEntries <= 0 {
@@ -97,7 +97,7 @@ func makeExIngest(w fyne.Window) fyne.CanvasObject {
 								log.Println("noppers...")
 							}
 						},
-						w,
+						g.window,
 					)
 					confirmDialog.Show()
 				},
@@ -107,11 +107,11 @@ func makeExIngest(w fyne.Window) fyne.CanvasObject {
 
 			scrollVertList := container.NewScroll(vertList)
 			border := container.NewBorder(buttonTop, nil, nil, nil, scrollVertList)
-			w.SetContent(border)
+			g.window.SetContent(border)
 
 			for i := 1; i <= numEntries; i++ {
-				ingestDataRow := NewIngestData(i, w)
-				ingestDataRow.AddImage(w)
+				ingestDataRow := NewIngestData(i, g.window)
+				ingestDataRow.AddImage(g.window)
 
 				ingestData.rows = append(ingestData.rows, ingestDataRow)
 
@@ -121,7 +121,7 @@ func makeExIngest(w fyne.Window) fyne.CanvasObject {
 					ingestDataRow.images,
 				)
 				vertList.Add(ingestRow)
-				w.SetContent(border)
+				g.window.SetContent(border)
 			}
 		},
 	}

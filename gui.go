@@ -24,22 +24,35 @@ func makeGUI() *GUI {
 		app:    a,
 	}
 
-	button1 := widget.NewButton("ingest", func() {
-		ingest := makeExIngest(gui.window)
-		gui.window.SetContent(ingest)
-	})
-	button2 := widget.NewButton("random exercises", func() {
-		log.Println("pog")
-	})
-
-	buttons := container.NewVBox(button1, button2)
-
-	gui.window.SetContent(container.NewCenter(buttons))
+	gui.startPage()
 
 	return gui
 }
 
-func (g *GUI) StartPage() {
+func (g *GUI) startPage() {
+	button1 := widget.NewButton("adicionar exercicios", func() {
+		ingest := makeExIngest(g)
+		g.window.SetContent(ingest)
+	})
+	button2 := widget.NewButton("fazer teste", func() {
+		log.Println("pog")
+	})
+
+	addBook := widget.NewButton(
+		"adicionar livro",
+		func() {
+			ingestBook := makeAddBook(g)
+			g.window.SetContent(ingestBook)
+		},
+	)
+
+	buttons := container.NewVBox(
+		button1,
+		button2,
+		addBook,
+	)
+
+	g.window.SetContent(container.NewCenter(buttons))
 }
 
 type Checklist struct {
