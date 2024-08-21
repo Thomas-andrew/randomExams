@@ -4,6 +4,21 @@ import (
 	"fmt"
 )
 
+type bookInfo struct {
+	id   int
+	info string
+}
+
+type bookInfos []bookInfo
+
+func newBookInfos() bookInfos {
+	return make(bookInfos, 0)
+}
+
+func (b *bookInfos) bestMatch() bookInfo {
+	return (*b)[0]
+}
+
 func powerSet(str string) []string {
 	lenStr := len(str)
 

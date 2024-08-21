@@ -1,8 +1,6 @@
 package main
 
 import (
-	"database/sql"
-
 	_ "github.com/mattn/go-sqlite3"
 
 	"fyne.io/fyne/v2"
@@ -49,12 +47,7 @@ func makeAddBook(g *GUI) fyne.CanvasObject {
 			{Text: "resultado:", Widget: results},
 		},
 		OnSubmit: func() {
-			db, err := sql.Open("sqlite3", "./randomEx.db")
-			if err != nil {
-				dialog.ShowError(err, g.window)
-				return
-			}
-			id, err := insertbookIdDB(db)
+			id, err := insertbookIdDB()
 			if err != nil {
 				dialog.ShowError(err, g.window)
 				return
@@ -69,7 +62,7 @@ func makeAddBook(g *GUI) fyne.CanvasObject {
 			}
 
 			for key, val := range values {
-				err := insertBookInfoDB(db, id, key, val)
+				err := insertBookInfoDB(id, key, val)
 				if err != nil {
 					dialog.ShowError(err, g.window)
 					return
@@ -80,38 +73,4 @@ func makeAddBook(g *GUI) fyne.CanvasObject {
 	}
 
 	return form
-}
-
-func insertBookInfoDB(db *sql.DB, bookID int64, typeField, content string) error {
-	stmt, err := db.Prepare("INSERT INTO bookInfo(bookID, typeField, content) VALUES (?, ?, ?)")
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(bookID, typeField, content)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func insertbookIdDB(db *sql.DB) (int64, error) {
-	stmt, err := db.Prepare("INSERT INTO bookId DEFAULT VALUES")
-	if err != nil {
-		return 0, err
-	}
-	defer stmt.Close()
-
-	result, err := stmt.Exec()
-	if err != nil {
-		return 0, err
-	}
-
-	bookId, err := result.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-	return bookId, nil
 }
