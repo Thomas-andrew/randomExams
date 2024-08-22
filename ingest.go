@@ -1,12 +1,27 @@
 package main
 
+// import (
+// 	"database/sql"
+// 	"fmt"
+// 	"log"
+// 	"sort"
+// 	"strconv"
+//
+// 	"fyne.io/fyne/v2"
+// 	"fyne.io/fyne/v2/canvas"
+// 	"fyne.io/fyne/v2/container"
+// 	"fyne.io/fyne/v2/dialog"
+// 	"fyne.io/fyne/v2/layout"
+// 	"fyne.io/fyne/v2/widget"
+// )
+//
 // type ingestData struct {
 // 	rows  []*ingestDataRow
 // 	mapEx map[int][]string
 //
 // 	num int
 // }
-
+//
 // func makeExIngest(g *GUI) fyne.CanvasObject {
 // 	entry := widget.NewEntry()
 // 	entry.SetPlaceHolder("Diga quantos exercicios:")

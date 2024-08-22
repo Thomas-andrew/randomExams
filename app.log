@@ -1,0 +1,27 @@
+time=2024-08-22T19:37:23.439-03:00 level=INFO msg="making GUI"
+time=2024-08-22T19:37:23.439-03:00 level=INFO msg="setting the start page"
+time=2024-08-22T19:37:42.128-03:00 level=INFO msg="making new ingest Form"
+time=2024-08-22T19:37:42.128-03:00 level=INFO msg="[ingestForm:selectBook] selecting a book"
+time=2024-08-22T19:37:42.128-03:00 level=INFO msg="retriving books from db"
+time=2024-08-22T19:37:56.761-03:00 level=INFO msg="adding a new book for ingest"
+time=2024-08-22T19:38:34.995-03:00 level=INFO msg="[ingestForm:choseChapterOption] new book doesn't have chapters saved. Automaticly adding new chapter."
+time=2024-08-22T19:38:34.995-03:00 level=INFO msg="[ingestForm:newChapter] adding new chapter"
+time=2024-08-22T19:38:42.045-03:00 level=INFO msg="[ingestForm:newChapter] adding new chapter"
+time=2024-08-22T19:39:09.678-03:00 level=INFO msg="chose how many exercises" answer=3
+time=2024-08-22T19:39:09.678-03:00 level=INFO msg="enter func: takeScreenshoots"
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="open db transaction"
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert new book into db" bookID=5
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert book info into db" bookID=5 typeField=title content="titulo do livro"
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert book info into db" bookID=5 typeField=author content="thomas A. tomberlin"
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert book info into db" bookID=5 typeField=volume content=2
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert book info into db" bookID=5 typeField=edition content=4
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert book info into db" bookID=5 typeField=publisher content=impa
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert book info into db" bookID=5 typeField=year content=2030
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert new chapter into db" bookID=5 chapterNum=1 chapterName=funções
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert new exercise into db" exID=10 exNumStr=1 exNumInt=1 chapterID=5
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="inserting exercise image into db" exID=10 imagePath=22082024-34235-193909.png
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert new exercise into db" exID=11 exNumStr=2 exNumInt=2 chapterID=5
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="inserting exercise image into db" exID=11 imagePath=22082024-34235-193919.png
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="insert new exercise into db" exID=12 exNumStr=3 exNumInt=3 chapterID=5
+time=2024-08-22T19:39:24.729-03:00 level=DEBUG msg="inserting exercise image into db" exID=12 imagePath=22082024-34235-193920.png
+time=2024-08-22T19:39:24.742-03:00 level=DEBUG msg="Commit db transaction"

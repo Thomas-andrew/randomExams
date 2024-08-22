@@ -2,7 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+	"strconv"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type bookInfoAtomDB struct {
@@ -16,6 +20,7 @@ func openDB() (*sql.DB, error) {
 }
 
 func getBooks() (bookInfos, error) {
+	Logger.Info("retriving books from db")
 	db, err := openDB()
 	if err != nil {
 		return nil, err
@@ -64,6 +69,13 @@ func getBooks() (bookInfos, error) {
 		bk := bookInfo{
 			id:   id,
 			info: str,
+
+			title:     infoMap["titulo"],
+			author:    infoMap["autor"],
+			volume:    infoMap["volume"],
+			edition:   infoMap["edição"],
+			publisher: infoMap["editora"],
+			year:      infoMap["ano"],
 		}
 
 		books = append(books, bk)
@@ -100,6 +112,9 @@ func getBookInfo(db *sql.DB) ([]bookInfoAtomDB, error) {
 }
 
 func listChapters(bookID int) (map[int]string, error) {
+	if bookID == 0 {
+		return nil, nil
+	}
 	db, err := openDB()
 	if err != nil {
 		return nil, err
@@ -127,24 +142,74 @@ func listChapters(bookID int) (map[int]string, error) {
 	return chapters, nil
 }
 
-func addChapters(bookID, chapterNum int, name string) error {
+func addChapters(bookID, chapterNum int, name string) (int, error) {
+	db, err := openDB()
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("INSERT INTO chapters(bookID, number, name) VALUES (?, ?, ?)")
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	res, err := stmt.Exec(bookID, chapterNum, name)
+	if err != nil {
+		return 0, err
+	}
+
+	chapterID, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(chapterID), nil
+}
+
+func addExerciseID(chapterID, exerNum int) (int, error) {
+	db, err := openDB()
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+
+	stmt, err := db.Prepare("INSERT INTO exerciseId(chapterID, exNum) VALUES (?, ?)")
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	res, err := stmt.Exec(chapterID, exerNum)
+	if err != nil {
+		return 0, err
+	}
+	exerID, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(exerID), nil
+}
+
+func addExerciseImage(exerID int, imgName string) error {
 	db, err := openDB()
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	stmt, err := db.Prepare("INSERT INTO chapters(bookID, number, name) VALUES (?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO exerciseData (exID, imageName) VALUES (?, ?)")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(bookID, chapterNum, name)
+	_, err = stmt.Exec(exerID, imgName)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -192,4 +257,182 @@ func insertbookIdDB() (int64, error) {
 		return 0, err
 	}
 	return bookId, nil
+}
+
+func (d *dynamicForm) submitToDB() error {
+	db, err := openDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	Logger.Debug("open db transaction")
+	// stage book info to db
+	var bookID int
+	if d.isNewBook {
+		// try add bookId
+		res, err := tx.Exec("INSERT INTO bookId DEFAULT VALUES")
+		if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+			}
+			return err
+		}
+
+		resBookID, err := res.LastInsertId()
+		if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+			}
+			return err
+		}
+		bookID = int(resBookID)
+		Logger.Debug("insert new book into db", "bookID", bookID)
+
+		// add book infos
+		infos := d.book.getInfos()
+		stmtBookInfo, err := tx.Prepare("INSERT INTO bookInfo (bookID, typeField, content) VALUES (?, ?, ?)")
+		if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+			}
+			return err
+		}
+		defer stmtBookInfo.Close()
+		for typeField, content := range infos {
+			_, err = stmtBookInfo.Exec(bookID, typeField, content)
+			if err != nil {
+				errTx := tx.Rollback()
+				if errTx != nil {
+					return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+				}
+				return err
+			}
+			Logger.Debug(
+				"insert book info into db",
+				"bookID", bookID,
+				"typeField", typeField,
+				"content", content,
+			)
+		}
+	} else {
+		bookID = d.book.id
+	}
+	// stage chapter info to db
+	var chapterID int
+	if d.isNewChapter {
+		res, err := tx.Exec(
+			"INSERT INTO chapters (bookID, number, name) VALUES (?, ?, ?)",
+			bookID,
+			d.chapterNum,
+			d.chapterName,
+		)
+		if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+			}
+			return err
+		}
+		resChapterID, err := res.LastInsertId()
+		if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+			}
+			return err
+		}
+		chapterID = int(resChapterID)
+		Logger.Debug(
+			"insert new chapter into db",
+			"bookID", bookID,
+			"chapterNum", d.chapterNum,
+			"chapterName", d.chapterName,
+		)
+	} else {
+		// // TODO: Add to dynamicForm chapterID  <21-08-24, twin>
+	}
+	// stage exercise info to db
+	stmtIdExer, err := tx.Prepare("INSERT INTO exerciseId (exNum, chapterID) VALUES (?, ?)")
+	if err != nil {
+		errTx := tx.Rollback()
+		if errTx != nil {
+			return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+		}
+		return err
+	}
+	stmtExerData, err := tx.Prepare("INSERT INTO exerciseData (exID, imageName) VALUES (?, ?)")
+	if err != nil {
+		errTx := tx.Rollback()
+		if errTx != nil {
+			return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+		}
+		return err
+	}
+
+	for _, exNum := range d.exercisesNum {
+		exNumInt, err := strconv.Atoi(exNum)
+		if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+			}
+			return err
+		}
+		res, err := stmtIdExer.Exec(exNum, chapterID)
+		if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+			}
+			return err
+		}
+		resExID, err := res.LastInsertId()
+		if err != nil {
+			errTx := tx.Rollback()
+			if errTx != nil {
+				return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+			}
+			return err
+		}
+		Logger.Debug(
+			"insert new exercise into db",
+			"exID", resExID,
+			"exNumStr", exNum,
+			"exNumInt", exNumInt,
+			"chapterID", chapterID,
+		)
+		// stage images info to db
+		for _, imagePath := range d.exerciseMap[exNumInt] {
+			_, err := stmtExerData.Exec(int(resExID), imagePath)
+			if err != nil {
+				errTx := tx.Rollback()
+				if errTx != nil {
+					return fmt.Errorf("2 ERRORS:\n\tERROR1: %w\n\tERROR2: %w\n", err, errTx)
+				}
+				return err
+			}
+			Logger.Debug(
+				"inserting exercise image into db",
+				"exID", resExID,
+				"imagePath", imagePath,
+			)
+		}
+	}
+
+	// commit if sucefull
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	Logger.Debug("Commit db transaction")
+
+	return nil
 }

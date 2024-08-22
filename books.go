@@ -7,6 +7,35 @@ import (
 type bookInfo struct {
 	id   int
 	info string
+
+	title     string
+	author    string
+	volume    string
+	edition   string
+	publisher string
+	year      string
+}
+
+func (b *bookInfo) generateInfo() {
+	var info string = ""
+	info += b.title + ", "
+	info += b.author + ", "
+	info += "vol." + b.volume + ", "
+	info += "ed." + b.edition + ", "
+	info += b.publisher + ", "
+	info += b.year
+	b.info = info
+}
+
+func (b *bookInfo) getInfos() map[string]string {
+	result := make(map[string]string)
+	result["title"] = b.title
+	result["author"] = b.author
+	result["volume"] = b.volume
+	result["edition"] = b.edition
+	result["publisher"] = b.publisher
+	result["year"] = b.year
+	return result
 }
 
 type bookInfos []bookInfo
@@ -15,8 +44,8 @@ func newBookInfos() bookInfos {
 	return make(bookInfos, 0)
 }
 
-func (b *bookInfos) bestMatch() bookInfo {
-	return (*b)[0]
+func (b *bookInfos) bestMatch() *bookInfo {
+	return &((*b)[0])
 }
 
 func powerSet(str string) []string {

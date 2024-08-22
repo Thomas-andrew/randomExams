@@ -1,14 +1,12 @@
 package main
 
 import (
-	_ "github.com/mattn/go-sqlite3"
-
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
-func makeAddBook(g *GUI) fyne.CanvasObject {
+func (d *dynamicForm) addNewBook(g *GUI) {
+	Logger.Info("adding a new book for ingest")
+
 	titleEntry := widget.NewEntry()
 	authorEntry := widget.NewEntry()
 	volumeEntry := widget.NewEntry()
@@ -47,30 +45,19 @@ func makeAddBook(g *GUI) fyne.CanvasObject {
 			{Text: "resultado:", Widget: results},
 		},
 		OnSubmit: func() {
-			id, err := insertbookIdDB()
-			if err != nil {
-				dialog.ShowError(err, g.window)
-				return
+			d.isNewBook = true
+			d.book = &bookInfo{
+				title:     titleEntry.Text,
+				author:    authorEntry.Text,
+				volume:    volumeEntry.Text,
+				edition:   editionEntry.Text,
+				publisher: publisherEntry.Text,
+				year:      yearEntry.Text,
 			}
-			values := map[string]string{
-				"titulo":  titleEntry.Text,
-				"autor":   authorEntry.Text,
-				"volume":  volumeEntry.Text,
-				"edição":  editionEntry.Text,
-				"editora": publisherEntry.Text,
-				"ano":     yearEntry.Text,
-			}
-
-			for key, val := range values {
-				err := insertBookInfoDB(id, key, val)
-				if err != nil {
-					dialog.ShowError(err, g.window)
-					return
-				}
-			}
-			g.startPage()
+			d.book.generateInfo()
+			d.choseChapterOption(g)
 		},
 	}
 
-	return form
+	g.window.SetContent(form)
 }

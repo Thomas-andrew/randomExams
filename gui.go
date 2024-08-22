@@ -24,27 +24,16 @@ func makeGUI() *GUI {
 		app:    a,
 	}
 
+	Logger.Info("making GUI")
 	gui.startPage()
 
 	return gui
 }
 
 func (g *GUI) startPage() {
-	// button1 := widget.NewButton("adicionar exercicios", func() {
-	// 	ingest := makeExIngest(g)
-	// 	g.window.SetContent(ingest)
-	// })
 	button2 := widget.NewButton("fazer teste", func() {
 		log.Println("pog")
 	})
-
-	addBook := widget.NewButton(
-		"adicionar livro",
-		func() {
-			ingestBook := makeAddBook(g)
-			g.window.SetContent(ingestBook)
-		},
-	)
 
 	testIngest := widget.NewButton(
 		"teste Ingest",
@@ -54,12 +43,11 @@ func (g *GUI) startPage() {
 	)
 
 	buttons := container.NewVBox(
-		// button1,
 		button2,
-		addBook,
 		testIngest,
 	)
 
+	Logger.Info("setting the start page")
 	g.window.SetContent(container.NewCenter(buttons))
 }
 
