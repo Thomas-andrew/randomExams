@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
@@ -31,12 +29,12 @@ func makeGUI() *GUI {
 }
 
 func (g *GUI) startPage() {
-	button2 := widget.NewButton("fazer teste", func() {
-		log.Println("pog")
+	button2 := widget.NewButton("gerar provas", func() {
+		makeTest(g)
 	})
 
 	testIngest := widget.NewButton(
-		"teste Ingest",
+		"addicionar exercicios",
 		func() {
 			makeIngestForm(g)
 		},
