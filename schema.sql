@@ -15,6 +15,7 @@ foreign key (bookID) references bookId(id)
 CREATE TABLE exerciseData(
 exID integer,
 imageName text,
+imageOrder integer,
 foreign key (exID) references exerciseId(id)
 );
 

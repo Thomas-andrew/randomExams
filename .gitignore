@@ -3,3 +3,4 @@
 *.jpg
 imgs/*
 *.db
+*.log

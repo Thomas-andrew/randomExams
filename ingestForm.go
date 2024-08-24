@@ -17,8 +17,7 @@ type dynamicForm struct {
 	book      *bookInfo
 
 	isNewChapter bool
-	chapterNum   int
-	chapterName  string
+	chapter      chapter
 
 	exercisesNum []string
 	exerciseMap  map[int][]string
@@ -33,7 +32,7 @@ func makeIngestForm(g *GUI) {
 }
 
 func (d *dynamicForm) selectBook(g *GUI) {
-	Logger.Info("[ingestForm:selectBook] selecting a book")
+	Logger.Debug("selecting a book")
 	bookEntry := widget.NewEntry()
 	bookLabel := widget.NewLabel("")
 
@@ -91,7 +90,7 @@ func (d *dynamicForm) selectBook(g *GUI) {
 	buttonGoBack := widget.NewButton(
 		"voltar",
 		func() {
-			Logger.Info("[ingestForm:selectBook] reset selecting a book")
+			Logger.Debug("reset selecting a book")
 			d.selectBook(g)
 		},
 	)
@@ -103,7 +102,11 @@ func (d *dynamicForm) selectBook(g *GUI) {
 				return bookScore(subs, bookList[i].info) > bookScore(subs, bookList[j].info)
 			})
 			bestMatchBook := bookList.bestMatch()
-			Logger.Info("[ingestForm:selectBook] book chosen", "bookID", bestMatchBook.id, "BookInfo", bestMatchBook.info)
+			Logger.Info(
+				"book chosen",
+				"bookID", bestMatchBook.id,
+				"BookInfo", bestMatchBook.info,
+			)
 
 			d.isNewBook = false
 			d.book = bestMatchBook
@@ -132,8 +135,9 @@ func (d *dynamicForm) choseChapterOption(g *GUI) {
 	// new Books don't have chapters saved
 	if d.isNewBook {
 		d.isNewChapter = true
-		Logger.Info("[ingestForm:choseChapterOption] new book doesn't have chapters saved. Automaticly adding new chapter.")
+		Logger.Info("new book doesn't have chapters saved. Automaticly adding new chapter.")
 		d.newChapter(g)
+		return
 	}
 
 	// list available chapters
@@ -148,8 +152,8 @@ func (d *dynamicForm) choseChapterOption(g *GUI) {
 	if len(chapters) == 0 {
 		chList = "nenhum capitulo no banco de dados"
 	} else {
-		for k, v := range chapters {
-			chList += strconv.Itoa(k) + " - " + v + "\n"
+		for _, chapter := range chapters {
+			chList += chapter.info + "\n"
 		}
 	}
 
@@ -167,7 +171,7 @@ func (d *dynamicForm) choseChapterOption(g *GUI) {
 		"capitulo antigo",
 		func() {
 			d.isNewChapter = false
-			// d.choseOldChapter(g, d.book)
+			d.oldChapter(g)
 		},
 	)
 
@@ -184,8 +188,93 @@ func (d *dynamicForm) choseChapterOption(g *GUI) {
 	g.window.SetContent(form)
 }
 
+func (d *dynamicForm) oldChapter(g *GUI) {
+	Logger.Debug("chosen old chapter")
+	bookChosen := widget.NewLabel("livro escolhido: " + d.book.info)
+
+	chapterEntry := widget.NewEntry()
+	oldChapterListLabel := widget.NewLabel("")
+	oldChapters, err := listChapters(d.book.id)
+	if err != nil {
+		dialog.ShowError(err, g.window)
+		return
+	}
+
+	if len(oldChapters) == 0 {
+		err := fmt.Errorf("[oldChapter] book chosen doesn't have old chapters")
+		Logger.Warn("len of oldChapters equal to 0", "ERROR", err)
+		dialog.ShowError(
+			err,
+			g.window,
+		)
+		d.newChapter(g)
+		return
+	}
+
+	var msg string
+	for _, oldChapter := range oldChapters {
+		msg += oldChapter.info + "\n"
+	}
+	oldChapterListLabel.SetText(msg)
+
+	// sort
+
+	chapterEntry.OnChanged = func(s string) {
+		subs := powerSet(s)
+		sort.Slice(
+			oldChapters,
+			func(i, j int) bool {
+				return bookScore(subs, oldChapters[i].info) > bookScore(subs, oldChapters[j].info)
+			},
+		)
+
+		var str string = ""
+		for _, chapter := range oldChapters {
+			str += fmt.Sprintf(
+				"score: %v,\t %v\n",
+				bookScore(subs, chapter.info),
+				chapter.info,
+			)
+		}
+		oldChapterListLabel.SetText(str)
+	}
+
+	submitButton := widget.NewButton(
+		"escolher",
+		func() {
+			if len(oldChapters) == 0 {
+				msg := "[oldChapter] oldChapters has zero lenght"
+				Logger.Error(msg)
+				dialog.ShowError(
+					fmt.Errorf(msg),
+					g.window,
+				)
+				return
+			}
+			chosenChap := oldChapters.bestMatch()
+			d.chapter = chosenChap
+			Logger.Info(
+				"chosen old chapter",
+				"chapterInfo", d.chapter.info,
+			)
+			d.howManyExercises(g)
+			return
+		},
+	)
+
+	form := container.NewVBox(
+		bookChosen,
+		chapterEntry,
+		oldChapterListLabel,
+		container.NewCenter(
+			submitButton,
+		),
+	)
+	g.window.SetContent(form)
+}
+
 func (d *dynamicForm) newChapter(g *GUI) {
-	Logger.Info("[ingestForm:newChapter] adding new chapter")
+	Logger.Info("adding new chapter")
 	bookChosen := widget.NewLabel("livro escolhido: " + d.book.info)
 
 	oldChapters := widget.NewLabel("")
@@ -194,14 +283,12 @@ func (d *dynamicForm) newChapter(g *GUI) {
 		dialog.ShowError(err, g.window)
 		return
 	}
-	if !d.isNewChapter {
-		var oldChaptersStr string = "Capitulos existentes\n"
-		for num, name := range chapters {
-			oldChaptersStr += strconv.Itoa(num) + " - " + name + "\n"
-		}
-
-		oldChapters.SetText(oldChaptersStr)
+	var oldChaptersStr string = "Capitulos existentes\n"
+	for _, chapter := range chapters {
+		oldChaptersStr += chapter.info + "\n"
 	}
+
+	oldChapters.SetText(oldChaptersStr)
 
 	chapterNumEntry := widget.NewEntry()
 	chapterNumEntry.SetPlaceHolder("numero do capitulo")
@@ -245,8 +332,12 @@ func (d *dynamicForm) newChapter(g *GUI) {
 					return
 				}
 			}
-			d.chapterNum = chapterNum
-			d.chapterName = chapterNameEntry.Text
+			chapter := chapter{
+				num:  chapterNum,
+				name: chapterNameEntry.Text,
+			}
+			chapter.generateInfo()
+			d.chapter = chapter
 			// go to the ask for how many screenshoots
 			d.howManyExercises(g)
 		},
@@ -264,10 +355,9 @@ func (d *dynamicForm) newChapter(g *GUI) {
 }
 
 func (d *dynamicForm) howManyExercises(g *GUI) {
+	Logger.Debug("entering howManyExercises")
 	bookChosen := widget.NewLabel("livro escolhido: " + d.book.info)
-	chapterChosen := widget.NewLabel(
-		"capitulo escolhido: " + strconv.Itoa(d.chapterNum) + " - " + d.chapterName,
-	)
+	chapterChosen := widget.NewLabel("capitulo escolhido: " + d.chapter.info)
 
 	numOfExercises := widget.NewEntry()
 	numOfExercises.SetPlaceHolder("Quantos exercicios? Ex: '1-3,5-8'")
@@ -275,10 +365,30 @@ func (d *dynamicForm) howManyExercises(g *GUI) {
 	submitButton := widget.NewButton(
 		"salvar",
 		func() {
+			Logger.Debug("running the saving function")
 			exerRanges, err := expandRanges(numOfExercises.Text)
 			if err != nil {
 				dialog.ShowError(err, g.window)
 				d.howManyExercises(g)
+			}
+			err = checkRanges(d.chapter, exerRanges)
+			if err != nil {
+				if _, ok := err.(ExerciseColisions); ok {
+					Logger.Warn("conflicting range of of exercises passed")
+					dialog.ShowError(
+						fmt.Errorf("[howManyExercises] %w", err),
+						g.window,
+					)
+					d.howManyExercises(g)
+					return
+				} else {
+					Logger.Error("error in checkRanges", "error", err)
+					dialog.ShowError(
+						fmt.Errorf("[howManyExercises] %w", err),
+						g.window,
+					)
+					return
+				}
 			}
 			d.exercisesNum = append(d.exercisesNum, exerRanges...)
 			Logger.Info("chose how many exercises", "answer", len(exerRanges))
@@ -310,7 +420,12 @@ func (d *dynamicForm) takeScreenshoots(g *GUI) {
 		func() {
 			d.exerciseMap = ingestExercises.retrivePaths()
 			info := "livro: " + d.book.info + "\n"
-			info += "capitulo: " + strconv.Itoa(d.chapterNum) + " - " + d.chapterName
+			info += "capitulo: " + d.chapter.info + "\n"
+			info += "exercicios: "
+			for _, exNum := range d.exercisesNum {
+				info += exNum + ", "
+			}
+			info += "\n"
 			saveImgsDialog := dialog.NewConfirm(
 				"Confirmação para salvar imagens",
 				info,
@@ -320,6 +435,7 @@ func (d *dynamicForm) takeScreenshoots(g *GUI) {
 						if err != nil {
 							dialog.ShowError(err, g.window)
 						}
+						g.startPage()
 					}
 				},
 				g.window,
@@ -351,6 +467,7 @@ func (d *dynamicForm) takeScreenshoots(g *GUI) {
 		)
 
 		vertList.Add(ingestRow)
+		vertListScroll.ScrollToBottom()
 		g.window.SetContent(border)
 	}
 }

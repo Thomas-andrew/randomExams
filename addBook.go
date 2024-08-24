@@ -55,6 +55,16 @@ func (d *dynamicForm) addNewBook(g *GUI) {
 				year:      yearEntry.Text,
 			}
 			d.book.generateInfo()
+			Logger.Debug(
+				"book enter into ingest form",
+				"title", d.book.title,
+				"author", d.book.author,
+				"volume", d.book.volume,
+				"edition", d.book.edition,
+				"publisher", d.book.publisher,
+				"year", d.book.year,
+			)
+			d.isNewBook = true
 			d.choseChapterOption(g)
 		},
 	}
