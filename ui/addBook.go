@@ -1,11 +1,14 @@
-package main
+package ui
 
 import (
+	"log/slog"
+
 	"fyne.io/fyne/v2/widget"
+	"github.com/Twintat/randomExams/data"
 )
 
-func (d *dynamicForm) addNewBook(g *GUI) {
-	Logger.Info("adding a new book for ingest")
+func addNewBook(form *data.IngestForm, g *GUI) {
+	slog.Info("adding a new book for ingest")
 
 	titleEntry := widget.NewEntry()
 	authorEntry := widget.NewEntry()
@@ -34,7 +37,7 @@ func (d *dynamicForm) addNewBook(g *GUI) {
 	publisherEntry.OnChanged = func(s string) { updateResults() }
 	yearEntry.OnChanged = func(s string) { updateResults() }
 
-	form := &widget.Form{
+	content := &widget.Form{
 		Items: []*widget.FormItem{
 			{Text: "titulo:", Widget: titleEntry},
 			{Text: "autor:", Widget: authorEntry},
@@ -45,29 +48,29 @@ func (d *dynamicForm) addNewBook(g *GUI) {
 			{Text: "resultado:", Widget: results},
 		},
 		OnSubmit: func() {
-			d.isNewBook = true
-			d.book = &bookInfo{
-				title:     titleEntry.Text,
-				author:    authorEntry.Text,
-				volume:    volumeEntry.Text,
-				edition:   editionEntry.Text,
-				publisher: publisherEntry.Text,
-				year:      yearEntry.Text,
+			form.IsNewBook = true
+			form.Book = &data.BookInfo{
+				Title:     titleEntry.Text,
+				Author:    authorEntry.Text,
+				Volume:    volumeEntry.Text,
+				Edition:   editionEntry.Text,
+				Publisher: publisherEntry.Text,
+				Year:      yearEntry.Text,
 			}
-			d.book.generateInfo()
-			Logger.Debug(
+			form.Book.GenerateInfo()
+			slog.Debug(
 				"book enter into ingest form",
-				"title", d.book.title,
-				"author", d.book.author,
-				"volume", d.book.volume,
-				"edition", d.book.edition,
-				"publisher", d.book.publisher,
-				"year", d.book.year,
+				"title", form.Book.Title,
+				"author", form.Book.Author,
+				"volume", form.Book.Volume,
+				"edition", form.Book.Edition,
+				"publisher", form.Book.Publisher,
+				"year", form.Book.Year,
 			)
-			d.isNewBook = true
-			d.choseChapterOption(g)
+			form.IsNewBook = true
+			choseChapterOption(form, g)
 		},
 	}
 
-	g.window.SetContent(form)
+	g.Window.SetContent(content)
 }

@@ -1,54 +1,54 @@
-package main
+package data
 
 import (
 	"fmt"
 )
 
-type bookInfo struct {
-	id   int
-	info string
+type BookInfo struct {
+	Id   int
+	Info string
 
-	title     string
-	author    string
-	volume    string
-	edition   string
-	publisher string
-	year      string
+	Title     string
+	Author    string
+	Volume    string
+	Edition   string
+	Publisher string
+	Year      string
 }
 
-func (b *bookInfo) generateInfo() {
+func (b *BookInfo) GenerateInfo() {
 	var info string = ""
-	info += b.title + ", "
-	info += b.author + ", "
-	info += "vol." + b.volume + ", "
-	info += "ed." + b.edition + ", "
-	info += b.publisher + ", "
-	info += b.year
-	b.info = info
+	info += b.Title + ", "
+	info += b.Author + ", "
+	info += "vol." + b.Volume + ", "
+	info += "ed." + b.Edition + ", "
+	info += b.Publisher + ", "
+	info += b.Year
+	b.Info = info
 }
 
-func (b *bookInfo) getInfos() map[string]string {
+func (b *BookInfo) GetInfos() map[string]string {
 	result := make(map[string]string)
-	result["title"] = b.title
-	result["author"] = b.author
-	result["volume"] = b.volume
-	result["edition"] = b.edition
-	result["publisher"] = b.publisher
-	result["year"] = b.year
+	result["title"] = b.Title
+	result["author"] = b.Author
+	result["volume"] = b.Volume
+	result["edition"] = b.Edition
+	result["publisher"] = b.Publisher
+	result["year"] = b.Year
 	return result
 }
 
-type bookInfos []bookInfo
+type BookInfos []BookInfo
 
-func newBookInfos() bookInfos {
-	return make(bookInfos, 0)
+func NewBookInfos() BookInfos {
+	return make(BookInfos, 0)
 }
 
-func (b *bookInfos) bestMatch() *bookInfo {
+func (b *BookInfos) BestMatch() *BookInfo {
 	return &((*b)[0])
 }
 
-func powerSet(str string) []string {
+func PowerSet(str string) []string {
 	lenStr := len(str)
 
 	var subs []string
@@ -62,7 +62,7 @@ func powerSet(str string) []string {
 	return subs
 }
 
-func bookScore(subs []string, book string) int {
+func BookScore(subs []string, book string) int {
 	var score int = 0
 	var logStr string
 

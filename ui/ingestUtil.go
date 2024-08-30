@@ -1,10 +1,14 @@
-package main
+package ui
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Twintat/randomExams/data"
+	db "github.com/Twintat/randomExams/database"
 )
 
 func imageName() string {
@@ -72,13 +76,13 @@ func (e ExerciseColisions) Error() string {
 	return msg
 }
 
-func checkRanges(chapter chapter, testRange []string) error {
+func checkRanges(chapter data.Chapter, testRange []string) error {
 	// get exercises
-	exers, err := chapter.getExercises()
+	exers, err := db.GetExercises(chapter)
 	if err != nil {
-		if _, ok := err.(NoID); ok {
+		if _, ok := err.(db.NoID); ok {
 			// chapter is no id, probably new
-			Logger.Debug("[checkRanges] chapter has no id")
+			slog.Debug("[checkRanges] chapter has no id")
 			return nil
 		}
 		return fmt.Errorf("[checkRanges] %w", err)
@@ -87,7 +91,7 @@ func checkRanges(chapter chapter, testRange []string) error {
 	var test bool = true
 	// colisions between exercises
 	var colisions []string
-	exersNumbers := exers.getRange()
+	exersNumbers := exers.GetRange()
 	for _, ex := range exersNumbers {
 		for _, testEx := range testRange {
 			if ex == testEx {

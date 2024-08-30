@@ -1,10 +1,12 @@
-package main
+package database
 
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strconv"
 
+	"github.com/Twintat/randomExams/data"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -18,8 +20,8 @@ func openDB() (*sql.DB, error) {
 	return sql.Open("sqlite3", "./exercises.db")
 }
 
-func getBooks() (bookInfos, error) {
-	Logger.Info("retriving books from db")
+func GetBooks() (data.BookInfos, error) {
+	slog.Info("retriving books from db")
 	db, err := openDB()
 	if err != nil {
 		return nil, fmt.Errorf("[getBooks]->%w", err)
@@ -47,7 +49,7 @@ func getBooks() (bookInfos, error) {
 	}
 
 	// concatenate string of info
-	books := newBookInfos()
+	books := data.NewBookInfos()
 	//  key, val
 	for id, infoMap := range bookInfosDB {
 		var str string = ""
@@ -58,16 +60,16 @@ func getBooks() (bookInfos, error) {
 		str += infoMap["publisher"] + ", "
 		str += infoMap["year"]
 
-		bk := bookInfo{
-			id:   id,
-			info: str,
+		bk := data.BookInfo{
+			Id:   id,
+			Info: str,
 
-			title:     infoMap["title"],
-			author:    infoMap["author"],
-			volume:    infoMap["volume"],
-			edition:   infoMap["edition"],
-			publisher: infoMap["publisher"],
-			year:      infoMap["year"],
+			Title:     infoMap["title"],
+			Author:    infoMap["author"],
+			Volume:    infoMap["volume"],
+			Edition:   infoMap["edition"],
+			Publisher: infoMap["publisher"],
+			Year:      infoMap["year"],
 		}
 
 		books = append(books, bk)
@@ -103,7 +105,7 @@ func getBookInfo(db *sql.DB) ([]bookInfoAtomDB, error) {
 	return bookInfosDB, nil
 }
 
-func (d *dynamicForm) submitToDB() error {
+func SubmitToDB(d *data.IngestForm) error {
 	db, err := openDB()
 	if err != nil {
 		return fmt.Errorf("[submitToDB] %w", err)
@@ -114,10 +116,10 @@ func (d *dynamicForm) submitToDB() error {
 	if err != nil {
 		return fmt.Errorf("[submitToDB] %w", err)
 	}
-	Logger.Debug("open db transaction")
+	slog.Debug("open db transaction")
 	// stage book info to db
 	var bookID int
-	if d.isNewBook {
+	if d.IsNewBook {
 		// try add bookId
 		res, err := tx.Exec("INSERT INTO bookId DEFAULT VALUES")
 		if err != nil {
@@ -137,10 +139,10 @@ func (d *dynamicForm) submitToDB() error {
 			return err
 		}
 		bookID = int(resBookID)
-		Logger.Debug("insert new book into db", "bookID", bookID)
+		slog.Debug("insert new book into db", "bookID", bookID)
 
 		// add book infos
-		infos := d.book.getInfos()
+		infos := d.Book.GetInfos()
 		stmtBookInfo, err := tx.Prepare("INSERT INTO bookInfo (bookID, typeField, content) VALUES (?, ?, ?)")
 		if err != nil {
 			errTx := tx.Rollback()
@@ -159,7 +161,7 @@ func (d *dynamicForm) submitToDB() error {
 				}
 				return err
 			}
-			Logger.Debug(
+			slog.Debug(
 				"insert book info into db",
 				"bookID", bookID,
 				"typeField", typeField,
@@ -167,16 +169,16 @@ func (d *dynamicForm) submitToDB() error {
 			)
 		}
 	} else {
-		bookID = d.book.id
+		bookID = d.Book.Id
 	}
 	// stage chapter info to db
 	var chapterID int
-	if d.isNewChapter {
+	if d.IsNewChapter {
 		res, err := tx.Exec(
 			"INSERT INTO chapters (bookID, number, name) VALUES (?, ?, ?)",
 			bookID,
-			d.chapter.num,
-			d.chapter.name,
+			d.Chapter.Num,
+			d.Chapter.Name,
 		)
 		if err != nil {
 			errTx := tx.Rollback()
@@ -194,11 +196,11 @@ func (d *dynamicForm) submitToDB() error {
 			return fmt.Errorf("[submitToDB] %w", err)
 		}
 		chapterID = int(resChapterID)
-		Logger.Debug(
+		slog.Debug(
 			"insert new chapter into db",
 			"bookID", bookID,
-			"chapterNum", d.chapter.num,
-			"chapterName", d.chapter.name,
+			"chapterNum", d.Chapter.Num,
+			"chapterName", d.Chapter.Name,
 		)
 	} else {
 		// // TODO: Add to dynamicForm chapterID  <21-08-24, twin>
@@ -221,7 +223,7 @@ func (d *dynamicForm) submitToDB() error {
 		return fmt.Errorf("[submitToDB] %w", err)
 	}
 
-	for _, exNum := range d.exercisesNum {
+	for _, exNum := range d.ExercisesNum {
 		exNumInt, err := strconv.Atoi(exNum)
 		if err != nil {
 			errTx := tx.Rollback()
@@ -246,7 +248,7 @@ func (d *dynamicForm) submitToDB() error {
 			}
 			return fmt.Errorf("[submitToDB] %w", err)
 		}
-		Logger.Debug(
+		slog.Debug(
 			"insert new exercise into db",
 			"exID", resExID,
 			"exNumStr", exNum,
@@ -254,7 +256,7 @@ func (d *dynamicForm) submitToDB() error {
 			"chapterID", chapterID,
 		)
 		// stage images info to db
-		for imageOrder, imagePath := range d.exerciseMap[exNumInt] {
+		for imageOrder, imagePath := range d.ExerciseMap[exNumInt] {
 			_, err := stmtExerData.Exec(int(resExID), imagePath, imageOrder)
 			if err != nil {
 				errTx := tx.Rollback()
@@ -263,7 +265,7 @@ func (d *dynamicForm) submitToDB() error {
 				}
 				return fmt.Errorf("[submitToDB] %w", err)
 			}
-			Logger.Debug(
+			slog.Debug(
 				"inserting exercise image into db",
 				"exID", resExID,
 				"imageOrder", imageOrder,
@@ -277,7 +279,92 @@ func (d *dynamicForm) submitToDB() error {
 	if err != nil {
 		return fmt.Errorf("[submitToDB] %w", err)
 	}
-	Logger.Debug("Commit db transaction")
+	slog.Debug("Commit db transaction")
 
 	return nil
+}
+
+func GetExercises(c data.Chapter) (data.Exercises, error) {
+	if c.Id == 0 {
+		return nil, NoID{objectName: "chapter"}
+	}
+	db, err := openDB()
+	if err != nil {
+		return nil, fmt.Errorf("[getExercises] %w", err)
+	}
+	defer db.Close()
+
+	// get exercise IDs from this chapter
+	query := "SELECT id, exNum FROM exerciseId WHERE chapterID = ?"
+	rowsExerIDs, err := db.Query(query, c.Id)
+	if err != nil {
+		return nil, fmt.Errorf("[getExercises] %w", err)
+	}
+	defer rowsExerIDs.Close()
+
+	exers := data.NewExercises()
+	// from exercise IDs get images
+	for rowsExerIDs.Next() {
+		// get exercise id and number
+		var exID, exNum int
+		err := rowsExerIDs.Scan(&exID, &exNum)
+		if err != nil {
+			return nil, fmt.Errorf("[getExercises] %w", err)
+		}
+		// from id and number get exercise order and image name
+		query = "SELECT imageName, imageOrder FROM exerciseData WHERE exID = ?"
+		rowsExerData, err := db.Query(query, exID)
+		if err != nil {
+			return nil, fmt.Errorf("[getExercises] %w", err)
+		}
+		ex := data.NewExercise(exID, exNum)
+		for rowsExerData.Next() {
+			var imageName string
+			var imageOrder int
+			err := rowsExerData.Scan(&imageName, &imageOrder)
+			if err != nil {
+				return nil, fmt.Errorf("[getExercises] %w", err)
+			}
+			ex.Images[imageOrder] = imageName
+		}
+		exers = append(exers, ex)
+	}
+
+	return exers, nil
+}
+
+// retrive from db
+// listChapters
+func ListChapters(bookID int) (data.Chapters, error) {
+	if bookID == 0 {
+		return nil, nil
+	}
+	db, err := openDB()
+	if err != nil {
+		return nil, fmt.Errorf("[listChapters] %w", err)
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT chapterID, number, name FROM chapters WHERE bookID = ?", bookID)
+	if err != nil {
+		return nil, fmt.Errorf("[listChapters] error retriving chapters of a book: %w", err)
+	}
+	defer rows.Close()
+
+	chapters := make(data.Chapters, 0)
+
+	for rows.Next() {
+		var chapterID int
+		var chapterNum int
+		var chapterName string
+
+		err = rows.Scan(&chapterID, &chapterNum, &chapterName)
+		if err != nil {
+			return nil, fmt.Errorf("[listChapters] error scanning chapterNum, chapterName: %w", err)
+		}
+		chapter := data.Chapter{Id: chapterID, Num: chapterNum, Name: chapterName}
+		chapter.GenerateInfo()
+		chapters = append(chapters, chapter)
+	}
+	return chapters, nil
 }

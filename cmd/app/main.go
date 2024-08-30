@@ -3,6 +3,8 @@ package main
 import (
 	"log/slog"
 	"os"
+
+	"github.com/Twintat/randomExams/ui"
 )
 
 var (
@@ -27,6 +29,7 @@ func main() {
 	LogLevel.Set(slog.LevelDebug)
 	Logger.Info("------------------------------------- application start --------------------------------------")
 
-	gui := makeGUI()
-	gui.window.ShowAndRun()
+	gui := ui.MakeGUI()
+	gui.StartPage()
+	gui.ShowAndRun()
 }
