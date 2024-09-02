@@ -10,99 +10,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type bookInfoAtomDB struct {
-	bookID    int
-	typeField string
-	content   string
-}
-
 func openDB() (*sql.DB, error) {
 	return sql.Open("sqlite3", "./exercises.db")
-}
-
-func GetBooks() (data.BookInfos, error) {
-	slog.Info("retriving books from db")
-	db, err := openDB()
-	if err != nil {
-		return nil, fmt.Errorf("[getBooks]->%w", err)
-	}
-	defer db.Close()
-
-	// first get all the books info
-	DBentries, err := getBookInfo(db)
-	if err != nil {
-		return nil, fmt.Errorf("[getBooks]->%w", err)
-	}
-
-	// separete for bookID
-	bookInfosDB := make(map[int]map[string]string)
-
-	for _, entry := range DBentries {
-		if book, exists := bookInfosDB[entry.bookID]; exists {
-			if _, exists = book[entry.typeField]; !exists {
-				bookInfosDB[entry.bookID][entry.typeField] = entry.content
-			}
-		} else {
-			bookInfosDB[entry.bookID] = make(map[string]string)
-			bookInfosDB[entry.bookID][entry.typeField] = entry.content
-		}
-	}
-
-	// concatenate string of info
-	books := data.NewBookInfos()
-	//  key, val
-	for id, infoMap := range bookInfosDB {
-		var str string = ""
-		str += infoMap["title"] + ", "
-		str += infoMap["author"] + ", "
-		str += infoMap["volume"] + ", "
-		str += infoMap["edition"] + ", "
-		str += infoMap["publisher"] + ", "
-		str += infoMap["year"]
-
-		bk := data.BookInfo{
-			Id:   id,
-			Info: str,
-
-			Title:     infoMap["title"],
-			Author:    infoMap["author"],
-			Volume:    infoMap["volume"],
-			Edition:   infoMap["edition"],
-			Publisher: infoMap["publisher"],
-			Year:      infoMap["year"],
-		}
-
-		books = append(books, bk)
-
-	}
-	return books, nil
-}
-
-func getBookInfo(db *sql.DB) ([]bookInfoAtomDB, error) {
-	query := "SELECT bookID, typeField, content FROM bookInfo"
-
-	rows, err := db.Query(query)
-	if err != nil {
-		return nil, fmt.Errorf("[getBookInfo] db query %w", err)
-	}
-	defer rows.Close()
-
-	var bookInfosDB []bookInfoAtomDB
-
-	for rows.Next() {
-		var info bookInfoAtomDB
-		err := rows.Scan(&info.bookID, &info.typeField, &info.content)
-		if err != nil {
-			return nil, fmt.Errorf("[getBookInfo] book info atom scan error: %w", err)
-		}
-		bookInfosDB = append(bookInfosDB, info)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("[getBookInfo] rows error: %w", err)
-	}
-
-	return bookInfosDB, nil
 }
 
 func SubmitToDB(d *data.IngestForm) error {
@@ -284,8 +193,8 @@ func SubmitToDB(d *data.IngestForm) error {
 	return nil
 }
 
-func GetExercises(c data.Chapter) (data.Exercises, error) {
-	if c.Id == 0 {
+func GetExercises(chapID int) (data.Exercises, error) {
+	if chapID == 0 {
 		return nil, NoID{objectName: "chapter"}
 	}
 	db, err := openDB()
@@ -296,7 +205,7 @@ func GetExercises(c data.Chapter) (data.Exercises, error) {
 
 	// get exercise IDs from this chapter
 	query := "SELECT id, exNum FROM exerciseId WHERE chapterID = ?"
-	rowsExerIDs, err := db.Query(query, c.Id)
+	rowsExerIDs, err := db.Query(query, chapID)
 	if err != nil {
 		return nil, fmt.Errorf("[getExercises] %w", err)
 	}
@@ -331,40 +240,4 @@ func GetExercises(c data.Chapter) (data.Exercises, error) {
 	}
 
 	return exers, nil
-}
-
-// retrive from db
-// listChapters
-func ListChapters(bookID int) (data.Chapters, error) {
-	if bookID == 0 {
-		return nil, nil
-	}
-	db, err := openDB()
-	if err != nil {
-		return nil, fmt.Errorf("[listChapters] %w", err)
-	}
-	defer db.Close()
-
-	rows, err := db.Query("SELECT chapterID, number, name FROM chapters WHERE bookID = ?", bookID)
-	if err != nil {
-		return nil, fmt.Errorf("[listChapters] error retriving chapters of a book: %w", err)
-	}
-	defer rows.Close()
-
-	chapters := make(data.Chapters, 0)
-
-	for rows.Next() {
-		var chapterID int
-		var chapterNum int
-		var chapterName string
-
-		err = rows.Scan(&chapterID, &chapterNum, &chapterName)
-		if err != nil {
-			return nil, fmt.Errorf("[listChapters] error scanning chapterNum, chapterName: %w", err)
-		}
-		chapter := data.Chapter{Id: chapterID, Num: chapterNum, Name: chapterName}
-		chapter.GenerateInfo()
-		chapters = append(chapters, chapter)
-	}
-	return chapters, nil
 }

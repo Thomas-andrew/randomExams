@@ -7,7 +7,7 @@ import (
 	"github.com/Twintat/randomExams/data"
 )
 
-func addNewBook(form *data.IngestForm, g *GUI) {
+func addNewBook(form *data.IngestForm) {
 	slog.Info("adding a new book for ingest")
 
 	titleEntry := widget.NewEntry()
@@ -68,9 +68,9 @@ func addNewBook(form *data.IngestForm, g *GUI) {
 				"year", form.Book.Year,
 			)
 			form.IsNewBook = true
-			choseChapterOption(form, g)
+			choseChapterOption(form)
 		},
 	}
 
-	g.Window.SetContent(content)
+	form.Gui.Window.SetContent(content)
 }

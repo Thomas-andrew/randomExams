@@ -5,10 +5,11 @@ import (
 )
 
 type Chapter struct {
-	Id   int
-	Num  int
-	Name string
-	Info string
+	Id     int
+	BookID int
+	Num    int
+	Name   string
+	Info   string
 }
 
 // generate info
@@ -20,4 +21,13 @@ type Chapters []Chapter
 
 func (c *Chapters) BestMatch() Chapter {
 	return (*c)[0]
+}
+
+func (c *Chapters) IsEqual(t Chapter) bool {
+	for _, currChap := range *c {
+		if currChap.Id == t.Id {
+			return true
+		}
+	}
+	return false
 }

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/Twintat/randomExams/data"
 	"github.com/Twintat/randomExams/ui"
 )
 
@@ -29,7 +30,7 @@ func main() {
 	LogLevel.Set(slog.LevelDebug)
 	Logger.Info("------------------------------------- application start --------------------------------------")
 
-	gui := ui.MakeGUI()
-	gui.StartPage()
+	gui := data.MakeGUI()
+	ui.StartPage(gui)
 	gui.ShowAndRun()
 }

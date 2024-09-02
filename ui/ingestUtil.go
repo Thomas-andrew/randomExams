@@ -78,7 +78,7 @@ func (e ExerciseColisions) Error() string {
 
 func checkRanges(chapter data.Chapter, testRange []string) error {
 	// get exercises
-	exers, err := db.GetExercises(chapter)
+	exers, err := db.GetExercises(chapter.Id)
 	if err != nil {
 		if _, ok := err.(db.NoID); ok {
 			// chapter is no id, probably new

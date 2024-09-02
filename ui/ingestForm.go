@@ -16,22 +16,23 @@ import (
 	db "github.com/Twintat/randomExams/database"
 )
 
-func makeIngestForm(g *GUI) {
+func makeIngestForm(g *data.GUI) {
 	slog.Info("making new ingest Form")
 	form := &data.IngestForm{
+		Gui:         g,
 		ExerciseMap: make(map[int][]string),
 	}
-	selectBook(form, g)
+	selectBook(form)
 }
 
-func selectBook(form *data.IngestForm, g *GUI) {
+func selectBook(form *data.IngestForm) {
 	slog.Debug("selecting a book")
 	bookEntry := widget.NewEntry()
 	bookLabel := widget.NewLabel("")
 
 	bookList, err := db.GetBooks()
 	if err != nil {
-		dialog.ShowError(err, g.Window)
+		dialog.ShowError(err, form.Gui.Window)
 		return
 	}
 
@@ -76,7 +77,7 @@ func selectBook(form *data.IngestForm, g *GUI) {
 	buttonNewBook := widget.NewButton(
 		"novo livro",
 		func() {
-			addNewBook(form, g)
+			addNewBook(form)
 		},
 	)
 
@@ -84,7 +85,7 @@ func selectBook(form *data.IngestForm, g *GUI) {
 		"voltar",
 		func() {
 			slog.Debug("reset selecting a book")
-			selectBook(form, g)
+			selectBook(form)
 		},
 	)
 	buttonSubimit := widget.NewButton(
@@ -103,7 +104,7 @@ func selectBook(form *data.IngestForm, g *GUI) {
 
 			form.IsNewBook = false
 			form.Book = bestMatchBook
-			choseChapterOption(form, g)
+			choseChapterOption(form)
 		},
 	)
 
@@ -119,24 +120,24 @@ func selectBook(form *data.IngestForm, g *GUI) {
 		container.NewCenter(formSelector),
 	)
 
-	g.Window.SetContent(bookSearch)
+	form.Gui.Window.SetContent(bookSearch)
 }
 
-func choseChapterOption(form *data.IngestForm, g *GUI) {
+func choseChapterOption(form *data.IngestForm) {
 	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info)
 
 	// new Books don't have chapters saved
 	if form.IsNewBook {
 		form.IsNewChapter = true
 		slog.Info("new book doesn't have chapters saved. Automaticly adding new chapter.")
-		newChapter(form, g)
+		newChapter(form)
 		return
 	}
 
 	// list available chapters
 	chapters, err := db.ListChapters(form.Book.Id)
 	if err != nil {
-		dialog.ShowError(err, g.Window)
+		dialog.ShowError(err, form.Gui.Window)
 		return
 	}
 
@@ -156,7 +157,7 @@ func choseChapterOption(form *data.IngestForm, g *GUI) {
 		"adicionar capitulo",
 		func() {
 			form.IsNewChapter = true
-			newChapter(form, g)
+			newChapter(form)
 		},
 	)
 
@@ -164,7 +165,7 @@ func choseChapterOption(form *data.IngestForm, g *GUI) {
 		"capitulo antigo",
 		func() {
 			form.IsNewChapter = false
-			oldChapter(form, g)
+			oldChapter(form)
 		},
 	)
 
@@ -178,10 +179,10 @@ func choseChapterOption(form *data.IngestForm, g *GUI) {
 			),
 		),
 	)
-	g.Window.SetContent(content)
+	form.Gui.Window.SetContent(content)
 }
 
-func oldChapter(form *data.IngestForm, g *GUI) {
+func oldChapter(form *data.IngestForm) {
 	slog.Debug("chosen old chapter")
 	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info)
 
@@ -189,7 +190,7 @@ func oldChapter(form *data.IngestForm, g *GUI) {
 	oldChapterListLabel := widget.NewLabel("")
 	oldChapters, err := db.ListChapters(form.Book.Id)
 	if err != nil {
-		dialog.ShowError(err, g.Window)
+		dialog.ShowError(err, form.Gui.Window)
 		return
 	}
 
@@ -198,9 +199,9 @@ func oldChapter(form *data.IngestForm, g *GUI) {
 		slog.Warn("len of oldChapters equal to 0", "ERROR", err)
 		dialog.ShowError(
 			err,
-			g.Window,
+			form.Gui.Window,
 		)
-		newChapter(form, g)
+		newChapter(form)
 		return
 	}
 
@@ -240,7 +241,7 @@ func oldChapter(form *data.IngestForm, g *GUI) {
 				slog.Error(msg)
 				dialog.ShowError(
 					fmt.Errorf(msg),
-					g.Window,
+					form.Gui.Window,
 				)
 				return
 			}
@@ -250,7 +251,7 @@ func oldChapter(form *data.IngestForm, g *GUI) {
 				"chosen old chapter",
 				"chapterInfo", form.Chapter.Info,
 			)
-			howManyExercises(form, g)
+			howManyExercises(form)
 			return
 		},
 	)
@@ -263,17 +264,17 @@ func oldChapter(form *data.IngestForm, g *GUI) {
 			submitButton,
 		),
 	)
-	g.Window.SetContent(content)
+	form.Gui.Window.SetContent(content)
 }
 
-func newChapter(form *data.IngestForm, g *GUI) {
+func newChapter(form *data.IngestForm) {
 	slog.Info("adding new chapter")
 	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info)
 
 	oldChapters := widget.NewLabel("")
 	chapters, err := db.ListChapters(form.Book.Id)
 	if err != nil {
-		dialog.ShowError(err, g.Window)
+		dialog.ShowError(err, form.Gui.Window)
 		return
 	}
 	var oldChaptersStr string = "Capitulos existentes\n"
@@ -306,14 +307,14 @@ func newChapter(form *data.IngestForm, g *GUI) {
 		func() {
 			chapterNum, err := strconv.Atoi(chapterNumEntry.Text)
 			if err != nil {
-				dialog.ShowError(err, g.Window)
+				dialog.ShowError(err, form.Gui.Window)
 				return
 			}
 			for num := range chapters {
 				if chapterNum == num {
 					dialog.ShowError(
 						fmt.Errorf("chapter %v already exists! cannot have to of it.", chapterNum),
-						g.Window,
+						form.Gui.Window,
 					)
 					slog.Warn("this chapter number already exists for this book",
 						"func",
@@ -321,7 +322,7 @@ func newChapter(form *data.IngestForm, g *GUI) {
 						"chapterNum",
 						chapterNum,
 					)
-					newChapter(form, g)
+					newChapter(form)
 					return
 				}
 			}
@@ -332,7 +333,7 @@ func newChapter(form *data.IngestForm, g *GUI) {
 			chapter.GenerateInfo()
 			form.Chapter = chapter
 			// go to the ask for how many screenshoots
-			howManyExercises(form, g)
+			howManyExercises(form)
 		},
 	)
 
@@ -344,10 +345,10 @@ func newChapter(form *data.IngestForm, g *GUI) {
 		chapterEntry,
 		container.NewCenter(submitButton),
 	)
-	g.Window.SetContent(content)
+	form.Gui.Window.SetContent(content)
 }
 
-func howManyExercises(form *data.IngestForm, g *GUI) {
+func howManyExercises(form *data.IngestForm) {
 	slog.Debug("entering howManyExercises")
 	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info)
 	chapterChosen := widget.NewLabel("capitulo escolhido: " + form.Chapter.Info)
@@ -361,8 +362,8 @@ func howManyExercises(form *data.IngestForm, g *GUI) {
 			slog.Debug("running the saving function")
 			exerRanges, err := expandRanges(numOfExercises.Text)
 			if err != nil {
-				dialog.ShowError(err, g.Window)
-				howManyExercises(form, g)
+				dialog.ShowError(err, form.Gui.Window)
+				howManyExercises(form)
 			}
 			err = checkRanges(form.Chapter, exerRanges)
 			if err != nil {
@@ -370,22 +371,22 @@ func howManyExercises(form *data.IngestForm, g *GUI) {
 					slog.Warn("conflicting range of of exercises passed")
 					dialog.ShowError(
 						fmt.Errorf("[howManyExercises] %w", err),
-						g.Window,
+						form.Gui.Window,
 					)
-					howManyExercises(form, g)
+					howManyExercises(form)
 					return
 				} else {
 					slog.Error("error in checkRanges", "error", err)
 					dialog.ShowError(
 						fmt.Errorf("[howManyExercises] %w", err),
-						g.Window,
+						form.Gui.Window,
 					)
 					return
 				}
 			}
 			form.ExercisesNum = append(form.ExercisesNum, exerRanges...)
 			slog.Info("chose how many exercises", "answer", len(exerRanges))
-			takeScreenshoots(form, g)
+			takeScreenshoots(form)
 		},
 	)
 
@@ -398,10 +399,10 @@ func howManyExercises(form *data.IngestForm, g *GUI) {
 		),
 	)
 
-	g.Window.SetContent(content)
+	form.Gui.Window.SetContent(content)
 }
 
-func takeScreenshoots(form *data.IngestForm, g *GUI) {
+func takeScreenshoots(form *data.IngestForm) {
 	slog.Info("enter func: takeScreenshoots")
 	ingestExercises := &ingestData{
 		num:   len(form.ExercisesNum),
@@ -426,12 +427,12 @@ func takeScreenshoots(form *data.IngestForm, g *GUI) {
 					if response {
 						err := db.SubmitToDB(form)
 						if err != nil {
-							dialog.ShowError(err, g.Window)
+							dialog.ShowError(err, form.Gui.Window)
 						}
-						g.StartPage()
+						StartPage(form.Gui)
 					}
 				},
-				g.Window,
+				form.Gui.Window,
 			)
 			saveImgsDialog.Show()
 		},
@@ -446,11 +447,11 @@ func takeScreenshoots(form *data.IngestForm, g *GUI) {
 		nil,            // botton
 		vertListScroll, // center
 	)
-	g.Window.SetContent(border)
+	form.Gui.Window.SetContent(border)
 
 	for i := 1; i <= len(form.ExercisesNum); i++ {
-		exer := newExerciseRow(i, g)
-		exer.AddImage(g)
+		exer := newExerciseRow(i, form)
+		exer.AddImage(form)
 
 		ingestExercises.rows = append(ingestExercises.rows, exer)
 		ingestRow := container.New(
@@ -461,7 +462,7 @@ func takeScreenshoots(form *data.IngestForm, g *GUI) {
 
 		vertList.Add(ingestRow)
 		vertListScroll.ScrollToBottom()
-		g.Window.SetContent(border)
+		form.Gui.Window.SetContent(border)
 	}
 }
 
@@ -491,7 +492,7 @@ type exerciseRow struct {
 	exerciseNum int
 }
 
-func newExerciseRow(num int, g *GUI) *exerciseRow {
+func newExerciseRow(num int, form *data.IngestForm) *exerciseRow {
 	images := container.NewVBox()
 	buttons := container.NewVBox()
 
@@ -506,7 +507,7 @@ func newExerciseRow(num int, g *GUI) *exerciseRow {
 	addButton := widget.NewButton(
 		"Adicionar imagem",
 		func() {
-			ingest.AddImage(g)
+			ingest.AddImage(form)
 		},
 	)
 
@@ -519,14 +520,14 @@ func (g *exerciseRow) CurrentImages() []string {
 	return g.imgPaths
 }
 
-func (e *exerciseRow) AddImage(g *GUI) {
+func (e *exerciseRow) AddImage(form *data.IngestForm) {
 	e.numOfPhotos += 1
 	//      ./imgs/01012024-0101-000000.png
 	imgName := imageName()
 	path := config.ImagesDirectory() + "/" + imgName
 	err := screenshoot(path)
 	if err != nil {
-		dialog.ShowError(err, g.Window)
+		dialog.ShowError(err, form.Gui.Window)
 	}
 
 	img := canvas.NewImageFromFile(path)
@@ -540,7 +541,7 @@ func (e *exerciseRow) AddImage(g *GUI) {
 		func() {
 			err := screenshoot(path)
 			if err != nil {
-				dialog.ShowError(err, g.Window)
+				dialog.ShowError(err, form.Gui.Window)
 			}
 
 			img.Refresh()
