@@ -4,3 +4,5 @@
 imgs/*
 *.db
 *.log
+bkup/*
+data.sql

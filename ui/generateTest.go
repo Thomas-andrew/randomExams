@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"log/slog"
+	"math/rand"
+	"sort"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -207,7 +209,7 @@ func defineExam(form *data.Exam) {
 				dialog.ShowError(err, form.Gui.Window)
 			}
 			form.Num = num
-			// runExam(form)
+			runExam(form)
 		},
 	)
 
@@ -216,4 +218,51 @@ func defineExam(form *data.Exam) {
 		contButton,
 	)
 	form.Gui.Window.SetContent(content)
+}
+
+func runExam(form *data.Exam) {
+	// build a exercise canvas
+
+	list := container.NewVBox()
+
+	chosen := []int{}
+	for i := 0; i < form.Num; i++ {
+		loteryID := rand.Intn(len(form.Pull))
+		for _, ch := range chosen {
+		}
+
+		exCanvas, err := exerciseCont(ex)
+		if err != nil {
+			slog.Error("[runExam]", "error", err)
+			dialog.ShowError(err, form.Gui.Window)
+		}
+		list.Add(exCanvas)
+	}
+	cont := container.NewVScroll(list)
+	form.Gui.Window.SetContent(cont)
+}
+
+func exerciseCont(ex data.Exercise) (fyne.CanvasObject, error) {
+	cont := container.NewVBox()
+
+	order := make([]int, 0, len(ex.Images))
+	for k := range ex.Images {
+		order = append(order, k)
+	}
+	sort.Slice(order, func(i, j int) bool {
+		return order[i] < order[j]
+	})
+
+	for i := range order {
+		imagePath, ok := ex.Images[i]
+		if !ok {
+			return nil, fmt.Errorf("[exerciseCont] image range and map mismatch")
+		}
+		slog.Info("images loaded", "path", imagePath)
+		// img := canvas.NewImageFromFile(imagePath)
+		// img.SetMinSize(fyne.NewSize(700, 500))
+		// img.FillMode = canvas.ImageFillContain
+		// cont.Add(img)
+	}
+	return cont, nil
 }
