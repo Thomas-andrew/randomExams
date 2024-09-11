@@ -1,8 +1,9 @@
 
 db := "exercises.db"
+main := "./cmd/app/main.go"
 
 run:
-    go run ./cmd/app/main.go
+    go run {{main}}
 
 debug:
-    go run -tags debug .
+    go run -tags debug {{main}}

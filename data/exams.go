@@ -1,10 +1,11 @@
 package data
 
 type Exam struct {
-	Gui  *GUI
-	Set  SetTable
-	Pull Exercises
-	Num  int
+	Gui      *GUI
+	Set      SetTable
+	Pull     Exercises
+	Num      int
+	Duration string
 }
 
 func NewExam(g *GUI) *Exam {

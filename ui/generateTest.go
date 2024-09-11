@@ -8,11 +8,14 @@ import (
 	"strconv"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	"github.com/Twintat/randomExams/config"
 	"github.com/Twintat/randomExams/data"
 	db "github.com/Twintat/randomExams/database"
+	"github.com/Twintat/randomExams/ui/layouts"
 )
 
 func startRandomExam(g *data.GUI) {
@@ -197,24 +200,28 @@ func newSet(form *data.Exam) {
 // }
 
 func defineExam(form *data.Exam) {
-	entry := widget.NewEntry()
-	entry.SetPlaceHolder("quantos exercicios na prova?")
+	entryExNum := widget.NewEntry()
+	entryExNum.SetPlaceHolder("quantos exercicios na prova?")
+	entryDuration := widget.NewEntry()
+	entryDuration.SetPlaceHolder("quanto tempo de prova?")
 
 	contButton := widget.NewButton(
 		"continuar",
 		func() {
-			num, err := strconv.Atoi(entry.Text)
+			numEx, err := strconv.Atoi(entryExNum.Text)
 			if err != nil {
 				slog.Error("[defineExam]", "error", err)
 				dialog.ShowError(err, form.Gui.Window)
 			}
-			form.Num = num
+			form.Num = numEx
+			form.Duration = entryDuration.Text
 			runExam(form)
 		},
 	)
 
 	content := container.NewVBox(
-		entry,
+		entryExNum,
+		entryDuration,
 		contButton,
 	)
 	form.Gui.Window.SetContent(content)
@@ -226,24 +233,43 @@ func runExam(form *data.Exam) {
 	list := container.NewVBox()
 
 	chosen := []int{}
+beforeLoop:
 	for i := 0; i < form.Num; i++ {
 		loteryID := rand.Intn(len(form.Pull))
-		for _, ch := range chosen {
-		}
+		slog.Info("pulled random exercise", "id", loteryID)
 
-		exCanvas, err := exerciseCont(ex)
+		// test if loteryID already chosen
+		for _, ch := range chosen {
+			if loteryID == ch {
+				// already matched, unchose!!!
+				slog.Info("pulled id was already chosen")
+				i--
+				continue beforeLoop
+			}
+		}
+		chosen = append(chosen, loteryID)
+
+		exCanvas, err := exerciseCont(form.Pull[loteryID])
 		if err != nil {
 			slog.Error("[runExam]", "error", err)
 			dialog.ShowError(err, form.Gui.Window)
 		}
 		list.Add(exCanvas)
 	}
-	cont := container.NewVScroll(list)
+	topBarWidgets := newTimer(form.Gui, form.Duration)
+	cont := container.New(
+		&layouts.ExamLayout{},
+		topBarWidgets.timer,
+		topBarWidgets.bar, topBarWidgets.button,
+		container.NewVScroll(list),
+	)
 	form.Gui.Window.SetContent(cont)
 }
 
 func exerciseCont(ex data.Exercise) (fyne.CanvasObject, error) {
-	cont := container.NewVBox()
+	cont := container.New(
+		&ExerciseExamLayout{},
+	)
 
 	order := make([]int, 0, len(ex.Images))
 	for k := range ex.Images {
@@ -259,10 +285,9 @@ func exerciseCont(ex data.Exercise) (fyne.CanvasObject, error) {
 			return nil, fmt.Errorf("[exerciseCont] image range and map mismatch")
 		}
 		slog.Info("images loaded", "path", imagePath)
-		// img := canvas.NewImageFromFile(imagePath)
-		// img.SetMinSize(fyne.NewSize(700, 500))
-		// img.FillMode = canvas.ImageFillContain
-		// cont.Add(img)
+		img := canvas.NewImageFromFile(config.ImagesDirectory() + "/" + imagePath)
+		img.FillMode = canvas.ImageFillContain
+		cont.Add(img)
 	}
 	return cont, nil
 }
