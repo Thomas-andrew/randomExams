@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -13,14 +14,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/Twintat/randomExams/config"
 	"github.com/Twintat/randomExams/data"
-	db "github.com/Twintat/randomExams/database"
+	"github.com/Twintat/randomExams/db"
 )
 
 func makeIngestForm(g *data.GUI) {
 	slog.Info("making new ingest Form")
 	form := &data.IngestForm{
-		Gui:         g,
-		ExerciseMap: make(map[int][]string),
+		Gui: g,
 	}
 	selectBook(form)
 }
@@ -29,8 +29,17 @@ func selectBook(form *data.IngestForm) {
 	slog.Debug("selecting a book")
 	bookEntry := widget.NewEntry()
 	bookLabel := widget.NewLabel("")
+	// open dbSource
+	dbSource, err := db.OpenDB()
+	if err != nil {
+		dialog.ShowError(err, form.Gui.Window)
+		return
+	}
+	defer dbSource.Close()
+	ctx := context.Background()
+	qdb := db.New(dbSource)
 
-	bookList, err := db.GetBooks()
+	bookList, err := qdb.GetBooks(ctx)
 	if err != nil {
 		dialog.ShowError(err, form.Gui.Window)
 		return
@@ -39,8 +48,8 @@ func selectBook(form *data.IngestForm) {
 	var bookListText string = ""
 	for i, book := range bookList {
 		bookListText += fmt.Sprintf(
-			"s 0,\t %v\n",
-			book.Info,
+			"score 0,\t %v\n",
+			book.Info(),
 		)
 		if i > 5 {
 			break
@@ -54,16 +63,16 @@ func selectBook(form *data.IngestForm) {
 		subs := data.PowerSet(text)
 
 		sort.Slice(bookList, func(i, j int) bool {
-			return data.BookScore(subs, bookList[i].Info) > data.BookScore(subs, bookList[j].Info)
+			return data.BookScore(subs, bookList[i].Info()) > data.BookScore(subs, bookList[j].Info())
 		})
 
 		var str string = ""
 
 		for i, book := range bookList {
 			str += fmt.Sprintf(
-				"s %v,\t %v\n",
-				data.BookScore(subs, book.Info),
-				book.Info,
+				"score %v,\t %v\n",
+				data.BookScore(subs, book.Info()),
+				book.Info(),
 			)
 			// only the first 5 best match books
 			if i > 5 {
@@ -93,13 +102,20 @@ func selectBook(form *data.IngestForm) {
 		func() {
 			subs := data.PowerSet(bookEntry.Text)
 			sort.Slice(bookList, func(i, j int) bool {
-				return data.BookScore(subs, bookList[i].Info) > data.BookScore(subs, bookList[j].Info)
+				return data.BookScore(subs, bookList[i].Info()) > data.BookScore(subs, bookList[j].Info())
 			})
-			bestMatchBook := bookList.BestMatch()
+			if len(bookList) == 0 {
+				dialog.ShowError(
+					fmt.Errorf("bookList has zero items"),
+					form.Gui.Window,
+				)
+				return
+			}
+			bestMatchBook := bookList[0]
 			slog.Info(
 				"book chosen",
-				"bookID", bestMatchBook.Id,
-				"BookInfo", bestMatchBook.Info,
+				"bookID", bestMatchBook.ID,
+				"BookInfo", bestMatchBook.Info(),
 			)
 
 			form.IsNewBook = false
@@ -124,7 +140,7 @@ func selectBook(form *data.IngestForm) {
 }
 
 func choseChapterOption(form *data.IngestForm) {
-	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info)
+	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info())
 
 	// new Books don't have chapters saved
 	if form.IsNewBook {
@@ -134,8 +150,19 @@ func choseChapterOption(form *data.IngestForm) {
 		return
 	}
 
+	// open db
+	dbSource, err := db.OpenDB()
+	if err != nil {
+		dialog.ShowError(err, form.Gui.Window)
+		return
+	}
+	defer dbSource.Close()
+
+	qdb := db.New(dbSource)
+	ctx := context.Background()
+
 	// list available chapters
-	chapters, err := db.ListChapters(form.Book.Id)
+	chapters, err := qdb.GetChapters(ctx, form.Book.ID)
 	if err != nil {
 		dialog.ShowError(err, form.Gui.Window)
 		return
@@ -147,7 +174,7 @@ func choseChapterOption(form *data.IngestForm) {
 		chList = "nenhum capitulo no banco de dados"
 	} else {
 		for _, chapter := range chapters {
-			chList += chapter.Info + "\n"
+			chList += chapter.Info() + "\n"
 		}
 	}
 
@@ -184,11 +211,23 @@ func choseChapterOption(form *data.IngestForm) {
 
 func oldChapter(form *data.IngestForm) {
 	slog.Debug("chosen old chapter")
-	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info)
+	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info())
 
 	chapterEntry := widget.NewEntry()
 	oldChapterListLabel := widget.NewLabel("")
-	oldChapters, err := db.ListChapters(form.Book.Id)
+
+	// open db
+	dbSource, err := db.OpenDB()
+	if err != nil {
+		dialog.ShowError(err, form.Gui.Window)
+		return
+	}
+	defer dbSource.Close()
+
+	qdb := db.New(dbSource)
+	ctx := context.Background()
+
+	oldChapters, err := qdb.GetChapters(ctx, form.Book.ID)
 	if err != nil {
 		dialog.ShowError(err, form.Gui.Window)
 		return
@@ -207,7 +246,7 @@ func oldChapter(form *data.IngestForm) {
 
 	var msg string
 	for _, oldChapter := range oldChapters {
-		msg += oldChapter.Info + "\n"
+		msg += oldChapter.Info() + "\n"
 	}
 	oldChapterListLabel.SetText(msg)
 
@@ -218,7 +257,7 @@ func oldChapter(form *data.IngestForm) {
 		sort.Slice(
 			oldChapters,
 			func(i, j int) bool {
-				return data.BookScore(subs, oldChapters[i].Info) > data.BookScore(subs, oldChapters[j].Info)
+				return data.BookScore(subs, oldChapters[i].Info()) > data.BookScore(subs, oldChapters[j].Info())
 			},
 		)
 
@@ -226,8 +265,8 @@ func oldChapter(form *data.IngestForm) {
 		for _, chapter := range oldChapters {
 			str += fmt.Sprintf(
 				"s %v,\t %v\n",
-				data.BookScore(subs, chapter.Info),
-				chapter.Info,
+				data.BookScore(subs, chapter.Info()),
+				chapter.Info(),
 			)
 		}
 		oldChapterListLabel.SetText(str)
@@ -245,11 +284,10 @@ func oldChapter(form *data.IngestForm) {
 				)
 				return
 			}
-			chosenChap := oldChapters.BestMatch()
-			form.Chapter = chosenChap
+			form.Chapter = oldChapters[0]
 			slog.Info(
 				"chosen old chapter",
-				"chapterInfo", form.Chapter.Info,
+				"chapterInfo", form.Chapter.Info(),
 			)
 			howManyExercises(form)
 			return
@@ -269,17 +307,28 @@ func oldChapter(form *data.IngestForm) {
 
 func newChapter(form *data.IngestForm) {
 	slog.Info("adding new chapter")
-	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info)
+	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info())
+
+	// open db
+	dbSource, err := db.OpenDB()
+	if err != nil {
+		dialog.ShowError(err, form.Gui.Window)
+		return
+	}
+	defer dbSource.Close()
+
+	qdb := db.New(dbSource)
+	ctx := context.Background()
 
 	oldChapters := widget.NewLabel("")
-	chapters, err := db.ListChapters(form.Book.Id)
+	chapters, err := qdb.GetChapters(ctx, form.Book.ID)
 	if err != nil {
 		dialog.ShowError(err, form.Gui.Window)
 		return
 	}
 	var oldChaptersStr string = "Capitulos existentes\n"
 	for _, chapter := range chapters {
-		oldChaptersStr += chapter.Info + "\n"
+		oldChaptersStr += chapter.Info() + "\n"
 	}
 
 	oldChapters.SetText(oldChaptersStr)
@@ -311,7 +360,7 @@ func newChapter(form *data.IngestForm) {
 				return
 			}
 			for num := range chapters {
-				if chapterNum == num {
+				if chapterNum == int(chapters[num].Number) {
 					dialog.ShowError(
 						fmt.Errorf("chapter %v already exists! cannot have to of it.", chapterNum),
 						form.Gui.Window,
@@ -326,11 +375,11 @@ func newChapter(form *data.IngestForm) {
 					return
 				}
 			}
-			chapter := data.Chapter{
-				Num:  chapterNum,
-				Name: chapterNameEntry.Text,
+			chapter := db.Chapter{
+				BookID: form.Book.ID,
+				Name:   chapterNameEntry.Text,
+				Number: int64(chapterNum),
 			}
-			chapter.GenerateInfo()
 			form.Chapter = chapter
 			// go to the ask for how many screenshoots
 			howManyExercises(form)
@@ -350,9 +399,12 @@ func newChapter(form *data.IngestForm) {
 
 func howManyExercises(form *data.IngestForm) {
 	slog.Debug("entering howManyExercises")
-	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info)
-	chapterChosen := widget.NewLabel("capitulo escolhido: " + form.Chapter.Info)
 
+	// display chosen book and chapter
+	bookChosen := widget.NewLabel("livro escolhido: " + form.Book.Info())
+	chapterChosen := widget.NewLabel("capitulo escolhido: " + form.Chapter.Info())
+
+	// entry for how many exercises as ranges
 	numOfExercises := widget.NewEntry()
 	numOfExercises.SetPlaceHolder("Quantos exercicios? Ex: '1-3,5-8'")
 
@@ -360,11 +412,13 @@ func howManyExercises(form *data.IngestForm) {
 		"salvar",
 		func() {
 			slog.Debug("running the saving function")
+			// decode range
 			exerRanges, err := expandRanges(numOfExercises.Text)
 			if err != nil {
 				dialog.ShowError(err, form.Gui.Window)
 				howManyExercises(form)
 			}
+			// check for colisions between range chosen and the exercises in db
 			err = checkRanges(form.Chapter, exerRanges)
 			if err != nil {
 				if _, ok := err.(ExerciseColisions); ok {
@@ -384,7 +438,14 @@ func howManyExercises(form *data.IngestForm) {
 					return
 				}
 			}
-			form.ExercisesNum = append(form.ExercisesNum, exerRanges...)
+			// range valid and no colisions
+			// create exercises for form
+			for tmpID, num := range exerRanges {
+				form.Exercises = append(form.Exercises, db.Exercise{
+					ID:     int64(tmpID), // temporary id for exercise
+					Number: int64(num),
+				})
+			}
 			slog.Info("chose how many exercises", "answer", len(exerRanges))
 			takeScreenshoots(form)
 		},
@@ -404,20 +465,15 @@ func howManyExercises(form *data.IngestForm) {
 
 func takeScreenshoots(form *data.IngestForm) {
 	slog.Info("enter func: takeScreenshoots")
-	ingestExercises := &ingestData{
-		num:   len(form.ExercisesNum),
-		mapEx: make(map[int][]string),
-	}
 
 	saveButton := widget.NewButton(
 		"salvar",
 		func() {
-			form.ExerciseMap = ingestExercises.retrivePaths()
-			info := "livro: " + form.Book.Info + "\n"
-			info += "capitulo: " + form.Chapter.Info + "\n"
+			info := "livro: " + form.Book.Info() + "\n"
+			info += "capitulo: " + form.Chapter.Info() + "\n"
 			info += "exercicios: "
-			for _, exNum := range form.ExercisesNum {
-				info += exNum + ", "
+			for _, ex := range form.Exercises {
+				info += strconv.Itoa(int(ex.Number)) + ", "
 			}
 			info += "\n"
 			saveImgsDialog := dialog.NewConfirm(
@@ -425,7 +481,7 @@ func takeScreenshoots(form *data.IngestForm) {
 				info,
 				func(response bool) {
 					if response {
-						err := db.SubmitToDB(form)
+						err := form.SubmitToDB()
 						if err != nil {
 							dialog.ShowError(err, form.Gui.Window)
 						}
@@ -449,11 +505,13 @@ func takeScreenshoots(form *data.IngestForm) {
 	)
 	form.Gui.Window.SetContent(border)
 
-	for i := 1; i <= len(form.ExercisesNum); i++ {
-		exer := newExerciseRow(i, form)
+	for _, ex := range form.Exercises {
+		// creating a exercise image container
+		// display the image + button for adding more images
+		exer := newExerciseRow(ex, form)
 		exer.AddImage(form)
 
-		ingestExercises.rows = append(ingestExercises.rows, exer)
+		// adding the exercise/image container to the pull
 		ingestRow := container.New(
 			NewIngestRowLayout(),
 			exer.buttons,
@@ -466,33 +524,15 @@ func takeScreenshoots(form *data.IngestForm) {
 	}
 }
 
-type ingestData struct {
-	rows  []*exerciseRow
-	mapEx map[int][]string
-
-	num int
-}
-
-func (i *ingestData) retrivePaths() map[int][]string {
-	result := make(map[int][]string)
-	for _, row := range i.rows {
-		result[row.exerciseNum] = append(result[row.exerciseNum], row.imgPaths...)
-	}
-	i.mapEx = result
-	return result
-}
-
 type exerciseRow struct {
 	images  *fyne.Container
 	buttons *fyne.Container
 
-	path        string
-	imgPaths    []string
-	numOfPhotos int
-	exerciseNum int
+	exercise db.Exercise
+	num      int64 // number of images
 }
 
-func newExerciseRow(num int, form *data.IngestForm) *exerciseRow {
+func newExerciseRow(ex db.Exercise, form *data.IngestForm) *exerciseRow {
 	images := container.NewVBox()
 	buttons := container.NewVBox()
 
@@ -500,8 +540,7 @@ func newExerciseRow(num int, form *data.IngestForm) *exerciseRow {
 		images:  images,
 		buttons: buttons,
 
-		numOfPhotos: 0,
-		exerciseNum: num,
+		exercise: ex,
 	}
 
 	addButton := widget.NewButton(
@@ -516,12 +555,8 @@ func newExerciseRow(num int, form *data.IngestForm) *exerciseRow {
 	return ingest
 }
 
-func (g *exerciseRow) CurrentImages() []string {
-	return g.imgPaths
-}
-
 func (e *exerciseRow) AddImage(form *data.IngestForm) {
-	e.numOfPhotos += 1
+	// e.numOfPhotos += 1
 	//      ./imgs/01012024-0101-000000.png
 	imgName := imageName()
 	path := config.ImagesDirectory() + "/" + imgName
@@ -534,10 +569,18 @@ func (e *exerciseRow) AddImage(form *data.IngestForm) {
 	img.SetMinSize(fyne.NewSize(700, 500))
 	img.FillMode = canvas.ImageFillContain
 	e.images.Add(img)
-	e.imgPaths = append(e.imgPaths, imgName)
+
+	e.num += 1
+	form.Images = append(form.Images,
+		db.Image{
+			ExID:     e.exercise.ID, // tmpID
+			FileName: imgName,
+			Sequence: e.num,
+		},
+	)
 
 	retakeButton := widget.NewButton(
-		fmt.Sprintf("retake %v", e.numOfPhotos),
+		fmt.Sprintf("retake %v", e.num),
 		func() {
 			err := screenshoot(path)
 			if err != nil {

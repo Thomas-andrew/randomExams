@@ -1,10 +1,12 @@
 package ui
 
 import (
+	"database/sql"
 	"log/slog"
 
 	"fyne.io/fyne/v2/widget"
 	"github.com/Twintat/randomExams/data"
+	"github.com/Twintat/randomExams/db"
 )
 
 func addNewBook(form *data.IngestForm) {
@@ -49,15 +51,20 @@ func addNewBook(form *data.IngestForm) {
 		},
 		OnSubmit: func() {
 			form.IsNewBook = true
-			form.Book = &data.BookInfo{
+			var volume sql.NullString
+			var edition sql.NullString
+			var publisher sql.NullString
+			volume.Scan(volumeEntry.Text)
+			edition.Scan(editionEntry.Text)
+			publisher.Scan(publisherEntry.Text)
+			form.Book = db.Book{
 				Title:     titleEntry.Text,
 				Author:    authorEntry.Text,
-				Volume:    volumeEntry.Text,
-				Edition:   editionEntry.Text,
-				Publisher: publisherEntry.Text,
+				Volume:    volume,
+				Edition:   edition,
+				Publisher: publisher,
 				Year:      yearEntry.Text,
 			}
-			form.Book.GenerateInfo()
 			slog.Debug(
 				"book enter into ingest form",
 				"title", form.Book.Title,

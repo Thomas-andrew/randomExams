@@ -1,14 +1,13 @@
 package ui
 
 import (
+	"context"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Twintat/randomExams/data"
-	db "github.com/Twintat/randomExams/database"
+	ndb "github.com/Twintat/randomExams/db"
 )
 
 func imageName() string {
@@ -25,11 +24,14 @@ func imageName() string {
 	return formattedTime + ".png"
 }
 
-func expandRanges(input string) ([]string, error) {
-	var result []string
+// recive "1-3,5-6"
+// return []int{1,2,3,5,6}
+func expandRanges(input string) ([]int, error) {
+	var result []int
 
 	input = strings.ReplaceAll(input, " ", "")
 
+	// split on commas
 	ranges := strings.Split(input, ",")
 	for _, r := range ranges {
 		bounds := strings.Split(r, "-")
@@ -47,7 +49,7 @@ func expandRanges(input string) ([]string, error) {
 		}
 
 		for i := start; i <= end; i++ {
-			result = append(result, strconv.Itoa(i))
+			result = append(result, i)
 		}
 
 	}
@@ -64,37 +66,40 @@ func expandRanges(input string) ([]string, error) {
 }
 
 type ExerciseColisions struct {
-	colisions []string
+	colisions []int
 }
 
 func (e ExerciseColisions) Error() string {
 	var msg string = "ERROR: exercises "
 	for _, colision := range e.colisions {
-		msg += colision + ", "
+		msg += fmt.Sprintln(colision) + ", "
 	}
 	msg += "already exists in the database"
 	return msg
 }
 
-func checkRanges(chapter data.Chapter, testRange []string) error {
-	// get exercises
-	exers, err := db.GetExercises(chapter.Id)
+func checkRanges(chapter ndb.Chapter, testRange []int) error {
+	// open db
+	dbSource, err := ndb.OpenDB()
 	if err != nil {
-		if _, ok := err.(db.NoID); ok {
-			// chapter is no id, probably new
-			slog.Debug("[checkRanges] chapter has no id")
-			return nil
-		}
+		return fmt.Errorf("[checkRanges] %w", err)
+	}
+	defer dbSource.Close()
+
+	qdb := ndb.New(dbSource)
+	ctx := context.Background()
+	// get exercises
+	exs, err := qdb.GetExeRange(ctx, chapter.ID)
+	if err != nil {
 		return fmt.Errorf("[checkRanges] %w", err)
 	}
 
 	var test bool = true
 	// colisions between exercises
-	var colisions []string
-	exersNumbers := exers.GetRange()
-	for _, ex := range exersNumbers {
+	var colisions []int
+	for _, ex := range exs {
 		for _, testEx := range testRange {
-			if ex == testEx {
+			if int(ex) == testEx {
 				test = false
 				colisions = append(colisions, testEx)
 			}

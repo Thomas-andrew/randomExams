@@ -27,6 +27,7 @@ func main() {
 			},
 		),
 	)
+	slog.SetDefault(Logger)
 	LogLevel.Set(slog.LevelDebug)
 	Logger.Info("------------------------------------- application start --------------------------------------")
 

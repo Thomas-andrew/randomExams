@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -14,7 +15,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/Twintat/randomExams/config"
 	"github.com/Twintat/randomExams/data"
-	db "github.com/Twintat/randomExams/database"
+	"github.com/Twintat/randomExams/db"
 	"github.com/Twintat/randomExams/ui/layouts"
 )
 
@@ -33,18 +34,32 @@ func isBook(id widget.TreeNodeID) bool {
 }
 
 func chaptersIDs(id widget.TreeNodeID) ([]widget.TreeNodeID, error) {
-	stringID := id[1:]
-	intID, err := strconv.Atoi(stringID)
+	// get ridof of prefix type
+	intID, err := strconv.Atoi(id[1:])
 	if err != nil {
-		return nil, fmt.Errorf("[chaptersIDs] %w", err)
+		return nil, err
 	}
-	chapters, err := db.ListChapters(intID)
+
+	// open db
+	dbSrc, err := db.OpenDB()
 	if err != nil {
-		return nil, fmt.Errorf("[chaptersIDs] %w", err)
+		return nil, err
 	}
+	defer dbSrc.Close()
+
+	qdb := db.New(dbSrc)
+	ctx := context.Background()
+
+	// get chapters
+	chapters, err := qdb.GetChapters(ctx, int64(intID))
+	if err != nil {
+		return nil, err
+	}
+
+	// add prefix type
 	result := []string{}
 	for _, chapter := range chapters {
-		result = append(result, "c"+strconv.Itoa(chapter.Id))
+		result = append(result, "c"+strconv.Itoa(int(chapter.ID)))
 	}
 	return result, nil
 }
@@ -58,37 +73,37 @@ func isChapter(id widget.TreeNodeID) bool {
 	return false
 }
 
-func exerciseIDs(id widget.TreeNodeID) ([]widget.TreeNodeID, error) {
-	realStrID := id[1:]
-	realID, err := strconv.Atoi(realStrID)
-	if err != nil {
-		return nil, err
-	}
-	exs, err := db.GetExercises(realID)
-	if err != nil {
-		return nil, err
-	}
-	result := []string{}
-	for _, ex := range exs {
-		result = append(result, "e"+strconv.Itoa(ex.Id))
-	}
-	return result, nil
-}
-
 // make set of exercise
 func newSet(form *data.Exam) {
-	books, err := db.GetBooks()
-	if err != nil {
+	// help func to fail
+	fail := func(err error) {
 		slog.Error("[newSet]", "error", err)
 		dialog.ShowError(err, form.Gui.Window)
 	}
 
+	dbSrc, err := db.OpenDB()
+	if err != nil {
+		fail(err)
+	}
+	defer dbSrc.Close()
+
+	qdb := db.New(dbSrc)
+	ctx := context.Background()
+
+	books, err := qdb.GetBooks(ctx)
+	if err != nil {
+		fail(err)
+	}
+
 	set := data.SetTable{}
 
+	// add prefix 'b' in the nodeID for indicating the type
 	var bookIDs []string
 	for _, book := range books {
-		bookIDs = append(bookIDs, "b"+strconv.Itoa(book.Id))
+		bookIDs = append(bookIDs, "b"+strconv.Itoa(int(book.ID)))
 	}
+
+	// creating the tree
 	tree := widget.NewTree(
 		// given an nodeID get the sub nodeIDs
 		func(id widget.TreeNodeID) []widget.TreeNodeID {
@@ -98,8 +113,7 @@ func newSet(form *data.Exam) {
 			case isBook(id):
 				chapters, err := chaptersIDs(id)
 				if err != nil {
-					slog.Error("[newSet]", "error", err)
-					dialog.ShowError(err, form.Gui.Window)
+					fail(err)
 				}
 				return chapters
 			}
@@ -125,12 +139,14 @@ func newSet(form *data.Exam) {
 			if len(id) == 0 {
 				return
 			}
+
+			// nodeID prefix type
 			treeType := id[0]
 			realID, err := strconv.Atoi(id[1:])
 			if err != nil {
-				slog.Error("[newSet]", "error", err)
-				dialog.ShowError(err, form.Gui.Window)
+				fail(err)
 			}
+
 			var checkChange func(b bool)
 			var text string
 			switch treeType {
@@ -138,22 +154,22 @@ func newSet(form *data.Exam) {
 				checkChange = func(b bool) {
 					set.AddBookID(realID)
 				}
-				info, err := db.GetBook(realID)
+				// pulling book from db and geting the info
+				book, err := qdb.GetBook(ctx, int64(realID))
 				if err != nil {
-					slog.Error("[newSet]", "error", err)
-					dialog.ShowError(err, form.Gui.Window)
+					fail(err)
 				}
-				text = info.Info
+				text = book.Info()
 			case 'c':
 				checkChange = func(b bool) {
 					set.AddBookID(realID)
 				}
-				info, err := db.GetChapter(realID)
+				// pulling chapter from db and geting the info
+				chapter, err := qdb.GetChapter(ctx, int64(realID))
 				if err != nil {
-					slog.Error("[newSet]", "error", err)
-					dialog.ShowError(err, form.Gui.Window)
+					fail(err)
 				}
-				text = info.Info
+				text = chapter.Info()
 			default:
 				checkChange = nil
 			}
@@ -175,12 +191,10 @@ func newSet(form *data.Exam) {
 	contButton := widget.NewButton(
 		"continuar",
 		func() {
-			// don't save but continue
-			form.Set = set
-			pull, err := db.GenExerPull(&form.Set)
+			// generate pull of exercises
+			pull, err := set.GenExerPull()
 			if err != nil {
-				slog.Error("[newSet]", "error", err)
-				dialog.ShowError(err, form.Gui.Window)
+				fail(err)
 			}
 			form.Pull = append(form.Pull, pull...)
 			defineExam(form)
@@ -266,26 +280,37 @@ beforeLoop:
 	form.Gui.Window.SetContent(cont)
 }
 
-func exerciseCont(ex data.Exercise) (fyne.CanvasObject, error) {
+// return the exercise container with all images
+func exerciseCont(ex db.Exercise) (fyne.CanvasObject, error) {
+	fail := func(err error) (fyne.CanvasObject, error) {
+		return nil, fmt.Errorf("[ExerciseCont] error creating container: %v", err)
+	}
 	cont := container.New(
 		&ExerciseExamLayout{},
 	)
-
-	order := make([]int, 0, len(ex.Images))
-	for k := range ex.Images {
-		order = append(order, k)
+	// open db
+	dbSrc, err := db.OpenDB()
+	if err != nil {
+		return fail(err)
 	}
-	sort.Slice(order, func(i, j int) bool {
-		return order[i] < order[j]
+	defer dbSrc.Close()
+
+	qdb := db.New(dbSrc)
+	ctx := context.Background()
+
+	// get images
+	images, err := qdb.GetImages(ctx, ex.ID)
+	if err != nil {
+		return fail(err)
+	}
+
+	sort.Slice(images, func(i, j int) bool {
+		return images[i].Sequence < images[j].Sequence
 	})
 
-	for i := range order {
-		imagePath, ok := ex.Images[i]
-		if !ok {
-			return nil, fmt.Errorf("[exerciseCont] image range and map mismatch")
-		}
-		slog.Info("images loaded", "path", imagePath)
-		img := canvas.NewImageFromFile(config.ImagesDirectory() + "/" + imagePath)
+	for _, img := range images {
+		slog.Info("images loaded", "path", img.FileName)
+		img := canvas.NewImageFromFile(config.ImagesDirectory() + "/" + img.FileName)
 		img.FillMode = canvas.ImageFillContain
 		cont.Add(img)
 	}
